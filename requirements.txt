@@ -1,0 +1,4 @@
+flask==3.*
+flask-cors==6.*
+pdf2docx==0.5.*
+gunicorn
