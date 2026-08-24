@@ -436,13 +436,17 @@
   const SUPABASE_URL = "https://yjxfxdbrjsiuevnkiiak.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqeGZ4ZGJyanNpdWV2bmtpaWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDMyNzUsImV4cCI6MjEwMzA3OTI3NX0.K83ZZJhw8kuCeHRfgN6wO30K9SHW_pyhQxaZufWE0jo";
 
+  // Where users land right after a successful login — the live production
+  // domain, not a relative path, per your request.
+  const POST_LOGIN_URL = "https://pdf2wordly.com/";
+
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   async function signInWithGoogle() {
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-      redirectTo: window.location.origin
+        redirectTo: POST_LOGIN_URL
       }
     });
     if (error) {
@@ -552,7 +556,7 @@
       if (error) {
         alert(error.message);
       } else {
-        window.location.href = "index.html";
+        window.location.href = POST_LOGIN_URL;
       }
     }
   });
