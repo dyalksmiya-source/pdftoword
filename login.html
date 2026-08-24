@@ -426,7 +426,34 @@
   </section>
 </main>
 
+<!-- Supabase client library (loaded once, before it's used below) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
+  // ---- Supabase client setup ----
+  // Renamed to `supabaseClient` (not `supabase`) to avoid clashing with the
+  // `supabase` global that the CDN script above already attaches to window.
+  const SUPABASE_URL = "https://yjxfxdbrjsiuevnkiiak.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqeGZ4ZGJyanNpdWV2bmtpaWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDMyNzUsImV4cCI6MjEwMzA3OTI3NX0.K83ZZJhw8kuCeHRfgN6wO30K9SHW_pyhQxaZufWE0jo";
+
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  async function signInWithGoogle() {
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "https://pdf2wordly.com/login.html"
+      }
+    });
+    if (error) {
+      alert(error.message);
+    }
+  }
+
+  document.querySelectorAll('.btn-google').forEach(btn => {
+    btn.addEventListener('click', signInWithGoogle);
+  });
+
   // Theme toggle (matches main site behavior)
   const themeToggle = document.getElementById('themeToggle');
   const root = document.documentElement;
@@ -507,7 +534,7 @@
     fieldEl.classList.toggle('has-error', !isValid);
   }
 
-  document.getElementById('loginForm').addEventListener('submit', (e) => {
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('loginEmail');
     const password = document.getElementById('loginPassword');
@@ -518,8 +545,15 @@
     validateField(document.getElementById('loginPasswordField'), passwordValid);
 
     if (emailValid && passwordValid) {
-      // Hook up real authentication here
-      console.log('Logging in with', email.value);
+      const { error } = await supabaseClient.auth.signInWithPassword({
+        email: email.value,
+        password: password.value
+      });
+      if (error) {
+        alert(error.message);
+      } else {
+        window.location.href = "index.html";
+      }
     }
   });
 
@@ -537,57 +571,22 @@
     validateField(document.getElementById('signupPasswordField'), passwordValid);
 
     if (nameValid && emailValid && passwordValid) {
-      // Hook up real account creation here
-   const { error } = await supabase.auth.signUp({
-  email: email.value,
-  password: password.value,
-  options: {
-    data: {
-      full_name: name.value
-    }
-  }
-});
+      const { error } = await supabaseClient.auth.signUp({
+        email: email.value,
+        password: password.value,
+        options: {
+          data: { full_name: name.value }
+        }
+      });
 
-if (error) {
-  alert(error.message);
-} else {
-  alert("Check your email to confirm your account");
-}
+      if (error) {
+        alert(error.message);
+      } else {
+        alert("Check your email to confirm your account");
+      }
     }
   });
 </script>
 
-
-  
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-
-  <script>
-const SUPABASE_URL = "https://yjxfxdbrjsiuevnkiiak.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqeGZ4ZGJyanNpdWV2bmtpaWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDMyNzUsImV4cCI6MjEwMzA3OTI3NX0.K83ZZJhw8kuCeHRfgN6wO30K9SHW_pyhQxaZufWE0jo";
-
-const supabase = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
-
-async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: "https://pdf2wordly.com/login.html"
-    }
-  });
-
-  if (error) {
-    alert(error.message);
-  }
-}
-
-document.querySelectorAll('.btn-google').forEach(btn => {
-  btn.addEventListener('click', signInWithGoogle);
-});
-</script>
-  
 </body>
 </html>
