@@ -1,10 +1,18 @@
 """
 PDFtoWord — conversion backend
 --------------------------------
-A small Flask API that accepts a PDF upload and returns a converted
-.docx file, using pdf2docx for the actual conversion.
+A Flask API that accepts a PDF upload and returns a converted .docx file.
+
+Strategy:
+  1. Try pdf2docx first (fast, preserves layout for normal text PDFs).
+  2. Check how much real text pdf2docx actually pulled out using PyMuPDF.
+     If a page has (almost) no extractable text, the PDF is likely
+     scanned/image-only, so pdf2docx alone would give an empty/broken result.
+  3. In that case, fall back to OCR: render each page to an image and run
+     Tesseract on it, then build a plain .docx with the recognized text.
 
 Endpoints:
+  GET  /api/health    -> health check
   POST /api/convert   -> multipart/form-data, field name "file"
                           returns the converted .docx as a file download
 
@@ -14,13 +22,16 @@ Run:
 
 import os
 import uuid
-import shutil
 import logging
 from pathlib import Path
 
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 from pdf2docx import Converter
+import fitz  # PyMuPDF
+import pytesseract
+from PIL import Image
+from docx import Document
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pdftoword")
@@ -32,6 +43,16 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 MAX_CONTENT_LENGTH = 25 * 1024 * 1024  # 25 MB, matches the frontend limit
+
+# How much text (characters) per page counts as "this page has real text".
+# Below this threshold across most pages, we treat the PDF as scanned.
+MIN_CHARS_PER_PAGE = 20
+
+# OCR render resolution. Higher = better accuracy, slower, more memory.
+OCR_ZOOM = 2.0
+
+# Languages Tesseract should look for. Add more codes if needed, e.g. "eng+fra+ara".
+OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+fra+ara")
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
@@ -46,6 +67,51 @@ def cleanup_files(*paths):
                 os.remove(path)
         except OSError as exc:
             logger.warning("Could not remove temp file %s: %s", path, exc)
+
+
+def pdf_is_scanned(pdf_path: Path) -> bool:
+    """Heuristic: open the PDF with PyMuPDF and check how much extractable
+    text each page has. If most pages have almost none, it's likely a
+    scanned/image-only PDF that pdf2docx can't handle properly."""
+    doc = fitz.open(pdf_path)
+    try:
+        if doc.page_count == 0:
+            return False
+        low_text_pages = 0
+        for page in doc:
+            text = page.get_text().strip()
+            if len(text) < MIN_CHARS_PER_PAGE:
+                low_text_pages += 1
+        return (low_text_pages / doc.page_count) >= 0.6
+    finally:
+        doc.close()
+
+
+def ocr_pdf_to_docx(pdf_path: Path, output_path: Path) -> None:
+    """Render each page as an image and run Tesseract OCR on it, then
+    write the recognized text into a .docx, one section per page."""
+    doc = fitz.open(pdf_path)
+    document = Document()
+    try:
+        matrix = fitz.Matrix(OCR_ZOOM, OCR_ZOOM)
+        for i, page in enumerate(doc):
+            pix = page.get_pixmap(matrix=matrix)
+            img_path = pdf_path.with_suffix(f".page{i}.png")
+            pix.save(img_path)
+            try:
+                with Image.open(img_path) as img:
+                    text = pytesseract.image_to_string(img, lang=OCR_LANGUAGES)
+            finally:
+                cleanup_files(img_path)
+
+            if i > 0:
+                document.add_page_break()
+            for line in text.splitlines():
+                document.add_paragraph(line)
+    finally:
+        doc.close()
+
+    document.save(output_path)
 
 
 @app.route("/api/health", methods=["GET"])
@@ -75,11 +141,15 @@ def convert():
         uploaded.save(input_path)
         logger.info("Converting %s (%d bytes)", uploaded.filename, input_path.stat().st_size)
 
-        converter = Converter(str(input_path))
-        try:
-            converter.convert(str(output_path))
-        finally:
-            converter.close()
+        if pdf_is_scanned(input_path):
+            logger.info("Detected scanned/image-only PDF, using OCR path")
+            ocr_pdf_to_docx(input_path, output_path)
+        else:
+            converter = Converter(str(input_path))
+            try:
+                converter.convert(str(output_path))
+            finally:
+                converter.close()
 
         if not output_path.exists():
             raise RuntimeError("Conversion did not produce an output file.")
