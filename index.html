@@ -28,30 +28,30 @@
 <link rel="stylesheet" href="style.css">
 
 <style>
-  /* ---- Profile / auth widget (added) ---- */
+  /* ---- Profile widget (added, uses variables already defined in style.css) ---- */
   .profile-chip{
     display:none;
     align-items:center;
     gap:8px;
     padding:4px 10px 4px 4px;
     border-radius:999px;
-    border:1px solid var(--border, #e2e2e2);
-    background:var(--surface, #fff);
+    border:1px solid var(--border);
+    background:var(--surface);
     cursor:pointer;
     position:relative;
-    font-family:Inter, sans-serif;
+    font-family:var(--font-body, Inter, sans-serif);
   }
   .profile-chip[data-active="true"]{ display:inline-flex; }
   .profile-avatar{
     width:26px;height:26px;border-radius:50%;
-    background:var(--primary, #4f46e5);
+    background:var(--primary);
     color:#fff;font-size:12px;font-weight:600;
     display:flex;align-items:center;justify-content:center;
     text-transform:uppercase;
   }
   .profile-email{
     font-size:13px;
-    max-width:150px;
+    max-width:160px;
     overflow:hidden;
     text-overflow:ellipsis;
     white-space:nowrap;
@@ -60,11 +60,11 @@
     position:absolute;
     top:calc(100% + 8px);
     right:0;
-    min-width:200px;
-    background:var(--surface,#fff);
-    border:1px solid var(--border,#e2e2e2);
-    border-radius:10px;
-    box-shadow:0 8px 24px rgba(0,0,0,.12);
+    min-width:210px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md, 10px);
+    box-shadow:var(--shadow-lg, 0 8px 24px rgba(0,0,0,.12));
     padding:8px;
     display:none;
     z-index:50;
@@ -72,9 +72,9 @@
   .profile-menu[data-open="true"]{ display:block; }
   .profile-menu-email{
     font-size:12px;
-    color:var(--muted,#777);
+    color:var(--text-muted);
     padding:6px 8px 8px;
-    border-bottom:1px solid var(--border,#eee);
+    border-bottom:1px solid var(--border);
     margin-bottom:6px;
     word-break:break-all;
   }
@@ -87,38 +87,9 @@
     border-radius:6px;
     font-size:13px;
     cursor:pointer;
+    color:var(--text);
   }
-  .profile-menu button:hover{ background:var(--surface-hover,#f3f3f3); }
-
-  /* Mock login modal (added) */
-  .auth-modal-backdrop{
-    position:fixed; inset:0;
-    background:rgba(0,0,0,.45);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:100;
-  }
-  .auth-modal-backdrop[data-open="true"]{ display:flex; }
-  .auth-modal{
-    background:var(--surface,#fff);
-    border-radius:12px;
-    width:min(360px, 90vw);
-    padding:24px;
-    font-family:Inter, sans-serif;
-  }
-  .auth-modal h2{ margin:0 0 4px; font-family:Sora, sans-serif; font-size:18px; }
-  .auth-modal p{ margin:0 0 16px; font-size:13px; color:var(--muted,#777); }
-  .auth-modal label{ display:block; font-size:12px; margin-bottom:6px; }
-  .auth-modal input{
-    width:100%; box-sizing:border-box;
-    padding:10px 12px; margin-bottom:14px;
-    border:1px solid var(--border,#ddd); border-radius:8px; font-size:14px;
-  }
-  .auth-modal-actions{ display:flex; gap:8px; }
-  .auth-modal-actions .btn{ flex:1; text-align:center; }
-  .auth-modal-error{ color:var(--danger,#d33); font-size:12px; margin:-8px 0 12px; display:none; }
-  .auth-modal-error[data-show="true"]{ display:block; }
+  .profile-menu button:hover{ background:var(--surface-sunken, #f3f3f3); }
 </style>
 </head>
 <body>
@@ -156,10 +127,10 @@
       </button>
 
       <!-- Logged-out state -->
-      <a href="#" class="btn btn-ghost" id="loginTrigger">Log in</a>
-      <a href="#pricing" class="btn btn-primary btn-small" id="getProBtn">Get Pro</a>
+      <a href="login.html" class="btn btn-ghost" id="loginLink">Log in</a>
+      <a href="#pricing" class="btn btn-primary btn-small">Get Pro</a>
 
-      <!-- Logged-in state (hidden until a mock login happens) -->
+      <!-- Logged-in state (hidden until a real Supabase session is found) -->
       <div class="profile-chip" id="profileChip" data-active="false">
         <span class="profile-avatar" id="profileAvatar">U</span>
         <span class="profile-email" id="profileEmailLabel"></span>
@@ -185,7 +156,7 @@
       </ul>
     </nav>
     <div class="mobile-menu-actions">
-      <a href="#" class="btn btn-ghost" id="loginTriggerMobile">Log in</a>
+      <a href="login.html" class="btn btn-ghost" id="loginLinkMobile">Log in</a>
       <a href="#pricing" class="btn btn-primary" id="getProBtnMobile">Get Pro</a>
       <div class="profile-chip" id="profileChipMobile" data-active="false" style="margin-top:8px;">
         <span class="profile-avatar" id="profileAvatarMobile">U</span>
@@ -195,21 +166,6 @@
     </div>
   </div>
 </header>
-
-<!-- ============ MOCK LOGIN MODAL (added) ============ -->
-<div class="auth-modal-backdrop" id="authModalBackdrop" data-open="false">
-  <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
-    <h2 id="authModalTitle">Log in</h2>
-    <p>This is a demo login — enter any email to simulate signing in.</p>
-    <label for="authEmailInput">Email</label>
-    <input type="email" id="authEmailInput" placeholder="you@example.com" autocomplete="email">
-    <p class="auth-modal-error" id="authModalError">Please enter a valid email address.</p>
-    <div class="auth-modal-actions">
-      <button type="button" class="btn btn-ghost" id="authModalCancel">Cancel</button>
-      <button type="button" class="btn btn-primary" id="authModalSubmit">Log in</button>
-    </div>
-  </div>
-</div>
 
 <main id="main">
 
@@ -587,13 +543,20 @@
 
 <script src="script.js"></script>
 
-<!-- ============ MOCK AUTH LOGIC (added) ============ -->
+<!-- Supabase client library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- ============ AUTH-AWARE HEADER (added) ============ -->
 <script>
 (function () {
-  const STORAGE_KEY = "mockAuthUser"; // stores the logged-in email
+  // Same project as login.html — keep these two values identical on every page.
+  const SUPABASE_URL = "https://yjxfxdbrjsiuevnkiiak.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqeGZ4ZGJyanNpdWV2bmtpaWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDMyNzUsImV4cCI6MjEwMzA3OTI3NX0.K83ZZJhw8kuCeHRfgN6wO30K9SHW_pyhQxaZufWE0jo";
 
-  // Header (desktop) elements
-  const loginTrigger = document.getElementById("loginTrigger");
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // Desktop elements
+  const loginLink = document.getElementById("loginLink");
   const profileChip = document.getElementById("profileChip");
   const profileAvatar = document.getElementById("profileAvatar");
   const profileEmailLabel = document.getElementById("profileEmailLabel");
@@ -601,47 +564,23 @@
   const profileMenuEmail = document.getElementById("profileMenuEmail");
   const logoutBtn = document.getElementById("logoutBtn");
 
-  // Mobile menu elements
-  const loginTriggerMobile = document.getElementById("loginTriggerMobile");
+  // Mobile elements
+  const loginLinkMobile = document.getElementById("loginLinkMobile");
   const profileChipMobile = document.getElementById("profileChipMobile");
   const profileAvatarMobile = document.getElementById("profileAvatarMobile");
   const profileEmailLabelMobile = document.getElementById("profileEmailLabelMobile");
   const logoutBtnMobile = document.getElementById("logoutBtnMobile");
 
-  // Modal elements
-  const authModalBackdrop = document.getElementById("authModalBackdrop");
-  const authEmailInput = document.getElementById("authEmailInput");
-  const authModalError = document.getElementById("authModalError");
-  const authModalSubmit = document.getElementById("authModalSubmit");
-  const authModalCancel = document.getElementById("authModalCancel");
-
-  function isValidEmail(value) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  }
-
-  function openModal() {
-    authModalError.dataset.show = "false";
-    authEmailInput.value = "";
-    authModalBackdrop.dataset.open = "true";
-    setTimeout(() => authEmailInput.focus(), 0);
-  }
-
-  function closeModal() {
-    authModalBackdrop.dataset.open = "false";
-  }
-
   function renderLoggedIn(email) {
-    const initial = email.trim().charAt(0).toUpperCase() || "U";
+    const initial = (email || "U").trim().charAt(0).toUpperCase();
 
-    // Desktop
-    loginTrigger.style.display = "none";
+    loginLink.style.display = "none";
     profileChip.dataset.active = "true";
     profileAvatar.textContent = initial;
     profileEmailLabel.textContent = email;
     profileMenuEmail.textContent = email;
 
-    // Mobile
-    loginTriggerMobile.style.display = "none";
+    loginLinkMobile.style.display = "none";
     profileChipMobile.dataset.active = "true";
     profileAvatarMobile.textContent = initial;
     profileEmailLabelMobile.textContent = email;
@@ -649,53 +588,39 @@
   }
 
   function renderLoggedOut() {
-    // Desktop
-    loginTrigger.style.display = "";
+    loginLink.style.display = "";
     profileChip.dataset.active = "false";
     profileMenu.dataset.open = "false";
     profileEmailLabel.textContent = "";
     profileMenuEmail.textContent = "";
 
-    // Mobile
-    loginTriggerMobile.style.display = "";
+    loginLinkMobile.style.display = "";
     profileChipMobile.dataset.active = "false";
     profileEmailLabelMobile.textContent = "";
     logoutBtnMobile.style.display = "none";
   }
 
-  function login(email) {
-    localStorage.setItem(STORAGE_KEY, email);
-    renderLoggedIn(email);
+  async function refreshAuthUI() {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      console.error(error);
+      renderLoggedOut();
+      return;
+    }
+    const session = data?.session;
+    if (session?.user?.email) {
+      renderLoggedIn(session.user.email);
+    } else {
+      renderLoggedOut();
+    }
   }
 
-  function logout() {
-    localStorage.removeItem(STORAGE_KEY);
+  async function handleLogout() {
+    await supabaseClient.auth.signOut();
     renderLoggedOut();
   }
 
-  function submitLogin() {
-    const email = authEmailInput.value.trim();
-    if (!isValidEmail(email)) {
-      authModalError.dataset.show = "true";
-      return;
-    }
-    login(email);
-    closeModal();
-  }
-
-  // Wire up events
-  loginTrigger.addEventListener("click", (e) => { e.preventDefault(); openModal(); });
-  loginTriggerMobile.addEventListener("click", (e) => { e.preventDefault(); openModal(); });
-
-  authModalCancel.addEventListener("click", closeModal);
-  authModalSubmit.addEventListener("click", submitLogin);
-  authEmailInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submitLogin();
-  });
-  authModalBackdrop.addEventListener("click", (e) => {
-    if (e.target === authModalBackdrop) closeModal();
-  });
-
+  // Wire up interactions
   profileChip.addEventListener("click", () => {
     profileMenu.dataset.open = profileMenu.dataset.open === "true" ? "false" : "true";
   });
@@ -703,14 +628,21 @@
     if (!profileChip.contains(e.target)) profileMenu.dataset.open = "false";
   });
 
-  logoutBtn.addEventListener("click", logout);
-  logoutBtnMobile.addEventListener("click", logout);
+  logoutBtn.addEventListener("click", handleLogout);
+  logoutBtnMobile.addEventListener("click", handleLogout);
 
-  // Restore session on load
-  const savedEmail = localStorage.getItem(STORAGE_KEY);
-  if (savedEmail) {
-    renderLoggedIn(savedEmail);
-  }
+  // Initial paint from current session
+  refreshAuthUI();
+
+  // Keep header in sync with real auth state (login on another tab,
+  // token refresh, sign-out elsewhere, magic-link/OAuth redirect back, etc.)
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    if (session?.user?.email) {
+      renderLoggedIn(session.user.email);
+    } else {
+      renderLoggedOut();
+    }
+  });
 })();
 </script>
 
