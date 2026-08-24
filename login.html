@@ -442,7 +442,7 @@
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "https://pdf2wordly.com/login.html"
+      redirectTo: window.location.origin
       }
     });
     if (error) {
