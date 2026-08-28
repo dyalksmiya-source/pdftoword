@@ -315,10 +315,22 @@
       <!-- LOGIN PANEL -->
       <div class="auth-panel is-active" id="panelLogin" role="tabpanel" aria-labelledby="tabLogin">
 
-        <div class="auth-heading">
-          <h1>Welcome back</h1>
-          <p>Log in to keep converting your PDFs.</p>
-        </div>
+<div class="auth-heading">
+  <h1>Welcome back</h1>
+  <p>Log in to keep converting your PDFs.</p>
+
+  <div id="loginMessage" style="
+    display: none;
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    background: #fff4e5;
+    border: 1px solid #f0b35b;
+    color: #8a5200;
+  "></div>
+</div>
 
         <button type="button" class="btn-google">
           <svg width="18" height="18" viewBox="0 0 18 18">
@@ -561,47 +573,100 @@
     }
   });
 
-  document.getElementById('signupForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('signupName');
-    const email = document.getElementById('signupEmail');
-    const password = document.getElementById('signupPassword');
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value);
-    const passwordValid = password.value.length >= 8;
-    const nameValid = name.value.trim().length > 0;
+ document.getElementById('signupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
 
-    validateField(document.getElementById('signupNameField'), nameValid);
-    validateField(document.getElementById('signupEmailField'), emailValid);
-    validateField(document.getElementById('signupPasswordField'), passwordValid);
+  const name = document.getElementById('signupName');
+  const email = document.getElementById('signupEmail');
+  const password = document.getElementById('signupPassword');
 
-    if (nameValid && emailValid && passwordValid) {
-    const { data, error } = await supabaseClient.auth.signUp({
-  email: email.value.trim(),
-  password: password.value,
-  options: {
-    data: {
-      full_name: name.value.trim()
-    }
+  const emailValue = email.value.trim().toLowerCase();
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
+  const passwordValid = password.value.length >= 8;
+  const nameValid = name.value.trim().length > 0;
+
+  validateField(
+    document.getElementById('signupNameField'),
+    nameValid
+  );
+
+  validateField(
+    document.getElementById('signupEmailField'),
+    emailValid
+  );
+
+  validateField(
+    document.getElementById('signupPasswordField'),
+    passwordValid
+  );
+
+  if (!nameValid || !emailValid || !passwordValid) {
+    return;
   }
-});
 
-if (error) {
-  alert(error.message);
-  return;
-}
-
-if (data.session) {
-  window.location.href = POST_LOGIN_URL;
-} else {
-  alert("Account created successfully. Please check your email to confirm your account.");
-}
-      if (error) {
-        alert(error.message);
-      } else {
-        alert("Check your email to confirm your account");
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: emailValue,
+    password: password.value,
+    options: {
+      data: {
+        full_name: name.value.trim()
       }
     }
   });
+
+  // Email already registered
+  if (error) {
+
+    const errorMessage = error.message.toLowerCase();
+
+    if (
+      errorMessage.includes("already registered") ||
+      errorMessage.includes("already exists") ||
+      errorMessage.includes("already been registered")
+    ) {
+
+      // Switch automatically to Login
+      setActiveTab('login');
+
+      // Put the same email automatically in Login
+      document.getElementById('loginEmail').value = emailValue;
+
+      // Clear Login password
+      document.getElementById('loginPassword').value = '';
+
+      // Show clear message
+      const loginMessage = document.getElementById('loginMessage');
+
+      loginMessage.innerHTML = `
+        <strong>This email already has an account.</strong><br>
+        Please enter your password below to log in.
+      `;
+
+      loginMessage.style.display = 'block';
+
+      // Focus password directly
+      setTimeout(() => {
+        document.getElementById('loginPassword').focus();
+      }, 300);
+
+      return;
+    }
+
+    // Other errors
+    alert(error.message);
+    return;
+  }
+
+  // Successful signup + automatic login
+  if (data.session) {
+    window.location.href = POST_LOGIN_URL;
+  } else {
+    alert(
+      "Account created successfully. Please check your email to confirm your account."
+    );
+  }
+});
 </script>
 
 </body>
