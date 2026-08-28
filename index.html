@@ -132,8 +132,7 @@
 
       <!-- Logged-out state -->
       <a href="login.html" class="btn btn-ghost" id="loginLink">Log in</a>
-      <a href="#pricing" class="btn btn-primary btn-small">Get Pro</a>
-
+   <a href="#" class="btn btn-primary btn-full get-pro-btn">Get Pro</a>
       <!-- Logged-in state (hidden until a real Supabase session is found) -->
       <div class="profile-chip" id="profileChip" data-active="false">
         <span class="profile-avatar" id="profileAvatar">U</span>
@@ -648,8 +647,55 @@
     }
   });
 })();
+
+
+
+  
 </script>
 <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
-  
+
+  <script>
+(function () {
+  'use strict';
+
+  const LEMON_CHECKOUT_URL =
+    'https://pdf2wordly.lemonsqueezy.com/checkout/buy/539e71b2-9f13-4f62-89c3-053c690074b9';
+
+  const getProButtons = document.querySelectorAll('.get-pro-btn');
+
+  async function handleGetPro(e) {
+    e.preventDefault();
+
+    const { data, error } = await supabaseClient.auth.getSession();
+
+    if (error) {
+      console.error('Auth error:', error);
+      alert('Something went wrong. Please try again.');
+      return;
+    }
+
+    const session = data?.session;
+
+    if (!session?.user) {
+      window.location.href = 'login.html';
+      return;
+    }
+
+    const userId = session.user.id;
+
+    const checkoutUrl =
+      LEMON_CHECKOUT_URL +
+      '?checkout[custom][supabase_user_id]=' +
+      encodeURIComponent(userId);
+
+    window.open(checkoutUrl, '_blank');
+  }
+
+  getProButtons.forEach(button => {
+    button.addEventListener('click', handleGetPro);
+  });
+
+})();
+</script>
 </body>
 </html>
