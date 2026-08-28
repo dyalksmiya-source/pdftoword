@@ -575,14 +575,26 @@
     validateField(document.getElementById('signupPasswordField'), passwordValid);
 
     if (nameValid && emailValid && passwordValid) {
-      const { error } = await supabaseClient.auth.signUp({
-        email: email.value,
-        password: password.value,
-        options: {
-          data: { full_name: name.value }
-        }
-      });
+    const { data, error } = await supabaseClient.auth.signUp({
+  email: email.value.trim(),
+  password: password.value,
+  options: {
+    data: {
+      full_name: name.value.trim()
+    }
+  }
+});
 
+if (error) {
+  alert(error.message);
+  return;
+}
+
+if (data.session) {
+  window.location.href = POST_LOGIN_URL;
+} else {
+  alert("Account created successfully. Please check your email to confirm your account.");
+}
       if (error) {
         alert(error.message);
       } else {
