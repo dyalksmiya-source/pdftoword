@@ -770,6 +770,74 @@ b{
 }
 
 
+
+
+/* ==========================================================================
+   Shared content-page components (callouts, comparison tables, CTAs)
+   Added for: pdf-to-word-without-losing-formatting.html,
+   convert-multiple-pdf-files-to-word.html, pdf-to-word-on-mac-and-mobile.html,
+   pdf-to-word-vs-smallpdf.html. Previously these were duplicated inline in
+   per-page <style> blocks (see how-to-convert-pdf-to-word.html and
+   pdf-to-word-alternative-to-ilovepdf.html); centralizing here avoids adding
+   a 5th and 6th copy. Existing pages are untouched and keep working as-is.
+   ========================================================================== */
+
+.article-cta {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.callout {
+  background: var(--primary-tint);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin: 4px 0 16px;
+}
+.callout p { color: var(--text); font-size: 14.5px; margin: 0; }
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 20px;
+  font-size: 14.5px;
+}
+.compare-table th, .compare-table td {
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+.compare-table th {
+  background: var(--surface-sunken);
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text);
+}
+.compare-table td { color: var(--text-muted); }
+.compare-table td strong { color: var(--text); }
+
+.legal-list.ol-numbered { counter-reset: step; }
+.legal-list.ol-numbered li { counter-increment: step; padding-left: 30px; }
+.legal-list.ol-numbered li::before {
+  content: counter(step);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  top: 2px;
+}
+
+
+
+
 .breadcrumb-nav{
   color: #7700ff;
   text-align: center;
