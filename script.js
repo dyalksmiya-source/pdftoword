@@ -31,7 +31,8 @@
     initializeMobileMenu();
     initializeUpload();
     initializeFAQ();
-    document.getElementById('year').textContent = new Date().getFullYear();
+    const yearEl = document.getElementById('year');
+    if (yearEl) yearEl.textContent = new Date().getFullYear();
   }
 
   /* ------------------------------------------------------------------ */
@@ -40,6 +41,8 @@
 
   function initializeTheme() {
     const toggle = document.getElementById('themeToggle');
+    if (!toggle) return;
+
     const stored = safeLocalStorageGet('pdftoword-theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const theme = stored || (prefersDark ? 'dark' : 'light');
@@ -61,6 +64,7 @@
       document.documentElement.removeAttribute('data-theme');
     }
     const toggle = document.getElementById('themeToggle');
+    if (!toggle) return;
     toggle.setAttribute('aria-pressed', String(theme === 'dark'));
     toggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
   }
@@ -79,6 +83,7 @@
   function initializeMobileMenu() {
     const toggle = document.getElementById('mobileMenuToggle');
     const menu = document.getElementById('mobileMenu');
+    if (!toggle || !menu) return;
 
     toggle.addEventListener('click', () => {
       const isOpen = toggle.getAttribute('aria-expanded') === 'true';
@@ -107,6 +112,7 @@
       question.addEventListener('click', () => {
         const expanded = question.getAttribute('aria-expanded') === 'true';
         const answer = document.getElementById(question.getAttribute('aria-controls'));
+        if (!answer) return;
         question.setAttribute('aria-expanded', String(!expanded));
         answer.hidden = expanded;
       });
@@ -119,6 +125,12 @@
 
   function initializeUpload() {
     const dropzone = document.getElementById('dropzone');
+    // Not every page embeds the converter widget (e.g. Teams, comparison,
+    // and guide pages only link to it). Bail out quietly instead of
+    // throwing, otherwise everything after this call in initializeApp()
+    // (FAQ accordion, footer year) never runs on those pages.
+    if (!dropzone) return;
+
     const fileInput = document.getElementById('fileInput');
     const browseBtn = document.getElementById('browseBtn');
     const removeFileBtn = document.getElementById('removeFileBtn');
@@ -203,12 +215,14 @@
 
   function showToolError(message) {
     const errorEl = document.getElementById('toolError');
+    if (!errorEl) return;
     errorEl.textContent = message;
     errorEl.hidden = false;
   }
 
   function clearToolError() {
     const errorEl = document.getElementById('toolError');
+    if (!errorEl) return;
     errorEl.hidden = true;
     errorEl.textContent = '';
   }
@@ -297,9 +311,20 @@
     });
   }
 
-  // Base URL of the conversion API. Points at the local Flask server during
-  // development; change this to your production API origin when deploying.
-  const API_BASE_URL = 'http://localhost:5001';
+  // Base URL of the conversion API.
+  //
+  // IMPORTANT — production configuration required:
+  // This now picks localhost only when the site itself is running on
+  // localhost (local development). On the live domain it falls back to the
+  // placeholder below, which will NOT work until you replace it with your
+  // real Railway backend URL (Railway dashboard → your service → Settings →
+  // Networking → Public Domain, looks like
+  // "https://your-service-name.up.railway.app"). See the deployment notes
+  // for the matching CORS change required on the Flask backend.
+  const API_BASE_URL =
+    window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5001'
+      : 'https://REPLACE-WITH-YOUR-RAILWAY-BACKEND-URL.up.railway.app';
 
   /**
    * Sends the PDF to the conversion backend and resolves with the
