@@ -257,10 +257,11 @@ img, svg { max-width: 100%; }
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);   /* رمادي أقوى بدل الفاتح */
   background: var(--surface);
-  color: var(--text-muted);
-  transition: color 150ms var(--ease), border-color 150ms var(--ease);
+  box-shadow: var(--shadow-sm);             /* كتعطيه شوية عمق بحال الأزرار لخرين */
+  color: var(--text);                       /* لون الأيقونة أدكن، ماشي muted */
+  transition: color 150ms var(--ease), border-color 150ms var(--ease), background 150ms var(--ease);
 }
 .theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
 .icon-moon { display: none; }
