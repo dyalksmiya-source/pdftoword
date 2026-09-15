@@ -254,16 +254,22 @@ img, svg { max-width: 100%; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);   /* رمادي أقوى بدل الفاتح */
+  border: 1.5px solid var(--border-strong);
   background: var(--surface);
-  box-shadow: var(--shadow-sm);             /* كتعطيه شوية عمق بحال الأزرار لخرين */
-  color: var(--text);                       /* لون الأيقونة أدكن، ماشي muted */
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  flex-shrink: 0;
   transition: color 150ms var(--ease), border-color 150ms var(--ease), background 150ms var(--ease);
 }
-.theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+.theme-toggle:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-tint);
+}
+.theme-toggle svg { width: 22px; height: 22px; }
 .icon-moon { display: none; }
 [data-theme="dark"] .icon-sun { display: none; }
 [data-theme="dark"] .icon-moon { display: block; }
