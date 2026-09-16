@@ -121,13 +121,7 @@
     <priority>0.7</priority>
   </url>
 
-  <!-- Teams -->
-  <url>
-    <loc>https://pdf2wordly.com/teams.html</loc>
-    <lastmod>2026-09-14</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
+
 
   <!-- Privacy -->
   <url>
