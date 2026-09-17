@@ -856,3 +856,29 @@ b{
 .breadcrumb a { color: inherit; text-decoration: none; }
 .breadcrumb a:hover { text-decoration: underline; }
 .section-note { text-align: center; margin-top: 24px; color: var(--text-muted, #666); font-size: 14px; }
+
+/* ==========================================================================
+   Plan badge (Free / Pro) injected by script.js into .header-actions.
+   Display-only UX affordance — the backend is authoritative for limits.
+   ========================================================================== */
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-sunken, #f3f3f3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.plan-badge[data-plan="pro"] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.plan-badge[hidden] { display: none; }
+@media (max-width: 860px) {
+  .header-actions .plan-badge { display: none; }
+}
