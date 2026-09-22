@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- Main Converter -->
+  <url>
+    <loc>https://pdf2wordly.com/</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+
+    <xhtml:link rel="alternate" hreflang="en" href="https://pdf2wordly.com/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://pdf2wordly.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://pdf2wordly.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pdf2wordly.com/"/>
+  </url>
+
+  <!-- French Homepage -->
+  <url>
+    <loc>https://pdf2wordly.com/fr/</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+
+    <xhtml:link rel="alternate" hreflang="en" href="https://pdf2wordly.com/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://pdf2wordly.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://pdf2wordly.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pdf2wordly.com/"/>
+  </url>
+
+  <!-- Arabic Homepage -->
+  <url>
+    <loc>https://pdf2wordly.com/ar/</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+
+    <xhtml:link rel="alternate" hreflang="en" href="https://pdf2wordly.com/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://pdf2wordly.com/fr/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://pdf2wordly.com/ar/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pdf2wordly.com/"/>
+  </url>
+
+  <!-- Scanned PDF / OCR -->
+  <url>
+    <loc>https://pdf2wordly.com/scanned-pdf-to-word.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Main How-To Guide -->
+  <url>
+    <loc>https://pdf2wordly.com/how-to-convert-pdf-to-word.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Formatting -->
+  <url>
+    <loc>https://pdf2wordly.com/pdf-to-word-without-losing-formatting.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Tables / Business Documents -->
+  <url>
+    <loc>https://pdf2wordly.com/pdf-to-word-tables-and-business-documents.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Resume -->
+  <url>
+    <loc>https://pdf2wordly.com/pdf-to-word-resume.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Multiple PDFs -->
+  <url>
+    <loc>https://pdf2wordly.com/convert-multiple-pdf-files-to-word.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Mac / Mobile -->
+  <url>
+    <loc>https://pdf2wordly.com/pdf-to-word-on-mac-and-mobile.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- iLovePDF Alternative -->
+  <url>
+    <loc>https://pdf2wordly.com/pdf-to-word-alternative-to-ilovepdf.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Smallpdf Comparison -->
+  <url>
+    <loc>https://pdf2wordly.com/pdf-to-word-vs-smallpdf.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Password Protected PDF -->
+  <url>
+    <loc>https://pdf2wordly.com/unlock-password-protected-pdf-to-word.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+
+
+  <!-- Privacy -->
+  <url>
+    <loc>https://pdf2wordly.com/privacy.html</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+
+</urlset>
