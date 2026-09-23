@@ -123,6 +123,30 @@
 
 
 
+  <!-- Troubleshooting -->
+  <url>
+    <loc>https://pdf2wordly.com/pdf-to-word-not-working.html</loc>
+    <lastmod>2026-09-23</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- About -->
+  <url>
+    <loc>https://pdf2wordly.com/about.html</loc>
+    <lastmod>2026-09-23</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Contact -->
+  <url>
+    <loc>https://pdf2wordly.com/contact.html</loc>
+    <lastmod>2026-09-23</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
   <!-- Privacy -->
   <url>
     <loc>https://pdf2wordly.com/privacy.html</loc>

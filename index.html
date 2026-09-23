@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#FAFAF9">
+<script>try{var t=localStorage.getItem('pdftoword-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <title>PDF to Word Converter – Convert PDF to Word Online Free | PDF2Wordly</title>
 <meta name="description" content="Convert PDF to Word online for free with PDF2Wordly. Upload your PDF and get an editable Word document quickly and securely.">
 <link rel="canonical" href="https://pdf2wordly.com/">
+<link rel="describedby" href="https://pdf2wordly.com/llms.txt">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
   <link rel="alternate" hreflang="en" href="https://pdf2wordly.com/">
@@ -29,6 +32,9 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://pdftoword-production-613f.up.railway.app">
+<link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
@@ -461,6 +467,31 @@
     </div>
   </section>
 
+  <!-- ============ WHAT TO EXPECT ============ -->
+  <section class="how-it-works" id="what-to-expect">
+    <div class="section-inner">
+      <p class="eyebrow">What you get</p>
+      <h2>An editable Word file that keeps your layout</h2>
+      <ol class="steps">
+        <li class="step">
+          <span class="step-index">Text</span>
+          <h3>Paragraphs stay editable</h3>
+          <p>Body text converts to normal Word paragraphs you can edit, restyle, and spell-check. <a href="pdf-to-word-without-losing-formatting.html">How formatting is preserved</a>.</p>
+        </li>
+        <li class="step">
+          <span class="step-index">Tables</span>
+          <h3>Tables and images carry over</h3>
+          <p>Tables, invoices, and embedded images are rebuilt in the .docx — handy for <a href="pdf-to-word-tables-and-business-documents.html">business documents</a> and <a href="pdf-to-word-resume.html">resumes</a>.</p>
+        </li>
+        <li class="step">
+          <span class="step-index">Edge cases</span>
+          <h3>Scans and locked files</h3>
+          <p>Image-only scans go through <a href="scanned-pdf-to-word.html">built-in OCR</a> (English, French, Arabic). Password-protected PDFs must be <a href="unlock-password-protected-pdf-to-word.html">unlocked first</a>.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
   <!-- ============ PRICING ============ -->
   <section class="pricing" id="pricing">
     <div class="section-inner">
@@ -614,7 +645,8 @@
   <ul>
     <li><a href="https://pdf2wordly.com/how-to-convert-pdf-to-word.html">How to Convert PDF to Word</a></li>
     <li><a href="pdf-to-word-alternative-to-ilovepdf.html">Alternative to iLovePDF</a></li>
-    <li><a href="privacy.html#contact">Contact</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="contact.html">Contact</a></li>
     <li><a href="privacy.html">Privacy Policy</a></li>
    
     <li><a href="pdf-to-word-without-losing-formatting.html">PDF to Word Without Losing Formatting</a></li>
@@ -641,7 +673,7 @@
   </div>
 </footer>
 
-<script src="script.js"></script>
+<script src="script.js" defer></script>
 
 <!-- Supabase client library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

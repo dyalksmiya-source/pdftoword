@@ -3,12 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#FAFAF9">
+<script>try{var t=localStorage.getItem('pdftoword-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <title>Privacy Policy – PDFtoWord</title>
 <meta name="description" content="Read how PDFtoWord collects, uses, and protects your data when you convert PDF files to Word documents.">
 <link rel="canonical" href="https://pdf2wordly.com/privacy.html">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://pdftoword-production-613f.up.railway.app">
+<link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
@@ -267,7 +272,7 @@
 
         <article id="contact" class="legal-section">
           <h2>Contact us</h2>
-          <p>If you have questions about this Privacy Policy or how your data is handled, reach out at <a href="mailto:privacy@example.com">privacy@example.com</a>.</p>
+          <p>If you have questions about this Privacy Policy or how your data is handled, see the <a href="contact.html">Contact page</a> for how to reach us.</p>
         </article>
 
       </div>
@@ -288,8 +293,8 @@
       <h3>Tools</h3>
       <ul>
         <li><a href="index.html#converter">PDF to Word</a></li>
-        <li><a href="#">PDF Compressor</a></li>
-        <li><a href="#">JPG to PDF</a></li>
+        <li><a href="scanned-pdf-to-word.html">Scanned PDF to Word (OCR)</a></li>
+        <li><a href="how-to-convert-pdf-to-word.html">How to Convert PDF to Word</a></li>
       </ul>
     </div>
 
@@ -297,7 +302,8 @@
       <h3>Company</h3>
       <ul>
       <li><a href="https://pdf2wordly.com/how-to-convert-pdf-to-word.html">How to Convert PDF to Word</a></li>
-        <li><a href="privacy.html#contact">Contact</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="contact.html">Contact</a></li>
         <li><a href="privacy.html">Privacy Policy</a></li>
       
         <li><a href="pdf-to-word-without-losing-formatting.html">PDF to Word Without Losing Formatting</a></li>
@@ -324,7 +330,7 @@
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
 </script>
-<script src="script.js"></script>
+<script src="script.js" defer></script>
 
 <!-- Supabase client library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
