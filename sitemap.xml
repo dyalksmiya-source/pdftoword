@@ -28,6 +28,25 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pdf2wordly.com/"/>
   </url>
 
+
+
+
+<url>
+  <loc>https://pdf2wordly.com/about.html</loc>
+  <lastmod>2026-09-24</lastmod>
+  <changefreq>yearly</changefreq>
+  <priority>0.5</priority>
+</url>
+ 
+<!-- Contact (added) -->
+<url>
+  <loc>https://pdf2wordly.com/contact.html</loc>
+  <lastmod>2026-09-24</lastmod>
+  <changefreq>yearly</changefreq>
+  <priority>0.5</priority>
+</url>
+
+        
   <!-- Arabic Homepage -->
   <url>
     <loc>https://pdf2wordly.com/ar/</loc>
