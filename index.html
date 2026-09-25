@@ -685,7 +685,8 @@
   const SUPABASE_URL = "https://yjxfxdbrjsiuevnkiiak.supabase.co";
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqeGZ4ZGJyanNpdWV2bmtpaWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDMyNzUsImV4cCI6MjEwMzA3OTI3NX0.K83ZZJhw8kuCeHRfgN6wO30K9SHW_pyhQxaZufWE0jo";
 
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+window.__supabaseClient = window.__supabaseClient || window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabaseClient = window.__supabaseClient;
 
   // Desktop elements
   const loginLink = document.getElementById("loginLink");
