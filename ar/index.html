@@ -36,7 +36,7 @@
 <link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="/style.css">
 
 <style>
   /* ---- Profile widget (added, uses variables already defined in style.css) ---- */
@@ -210,7 +210,7 @@
     <nav class="main-nav" aria-label="التنقل الرئيسي">
       <ul>
         <li><a href="#converter">PDF إلى Word</a></li>
-         <li><a href="https://pdf2wordly.com/scanned-pdf-to-word.html">PDF ممسوح ضوئيًا</a></li>
+         <li><a href="/scanned-pdf-to-word.html">PDF ممسوح ضوئيًا</a></li>
         <li><a href="#how-it-works">كيفاش كيخدم</a></li>
         <li><a href="#features">الميزات</a></li>
         <li><a href="#faq">الأسئلة الشائعة</a></li>
@@ -224,7 +224,7 @@
       </button>
 
       <!-- Logged-out state -->
-      <a href="../login.html" class="btn btn-ghost" id="loginLink">تسجيل الدخول</a>
+      <a href="/login.html" class="btn btn-ghost" id="loginLink">تسجيل الدخول</a>
    <a href="#" class="btn btn-primary btn-full get-pro-btn">اشترك فـ Pro</a>
       <!-- Logged-in state (hidden until a real Supabase session is found) -->
       <div class="profile-chip" id="profileChip" data-active="false">
@@ -252,7 +252,7 @@
       </ul>
     </nav>
     <div class="mobile-menu-actions">
-      <a href="../login.html" class="btn btn-ghost" id="loginLinkMobile">تسجيل الدخول</a>
+      <a href="/login.html" class="btn btn-ghost" id="loginLinkMobile">تسجيل الدخول</a>
       <a href="#pricing" class="btn btn-primary" id="getProBtnMobile">اشترك فـ Pro</a>
       <div class="profile-chip" id="profileChipMobile" data-active="false" style="margin-top:8px;">
         <span class="profile-avatar" id="profileAvatarMobile">U</span>
@@ -608,7 +608,7 @@
   <h3>الأدوات</h3>
   <ul>
     <li><a href="#converter">PDF إلى Word</a></li>
-    <li><a href="../scanned-pdf-to-word.html">PDF ممسوح ضوئيًا إلى Word (OCR)</a></li>
+    <li><a href="/scanned-pdf-to-word.html">PDF ممسوح ضوئيًا إلى Word (OCR)</a></li>
     
   </ul>
 </div>
@@ -616,11 +616,11 @@
 <div class="footer-col">
   <h3>الشركة</h3>
   <ul>
-    <li><a href="https://pdf2wordly.com/how-to-convert-pdf-to-word.html">كيفاش تحول PDF إلى Word</a></li>
-    <li><a href="../pdf-to-word-alternative-to-ilovepdf.html">بديل لـ iLovePDF</a></li>
-<li><a href="../about.html">من نحن</a></li>
-        <li><a href="../contact.html">تواصل معنا</a></li>
-    <li><a href="../privacy.html">سياسة الخصوصية</a></li>
+    <li><a href="/how-to-convert-pdf-to-word.html">كيفاش تحول PDF إلى Word</a></li>
+    <li><a href="/pdf-to-word-alternative-to-ilovepdf.html">بديل لـ iLovePDF</a></li>
+<li><a href="/about.html">من نحن</a></li>
+        <li><a href="/contact.html">تواصل معنا</a></li>
+    <li><a href="/privacy.html">سياسة الخصوصية</a></li>
 
   </ul>
 </div>
@@ -639,7 +639,7 @@
   </div>
 </footer>
 
-<script src="../script.js" defer></script>
+<script src="/script.js" defer></script>
 
 <!-- Supabase client library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -772,7 +772,7 @@
     const session = data?.session;
 
     if (!session?.user) {
-      window.location.href = '../login.html';
+      window.location.href = '/login.html';
       return;
     }
 
