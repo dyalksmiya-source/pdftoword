@@ -1,0 +1,44 @@
+# PDF2Wordly
+
+> PDF2Wordly (https://pdf2wordly.com/) is a free online tool that converts PDF
+> files into editable Word (.docx) documents. Free accounts convert with a
+> daily limit and a 25 MB per-file limit. Pro ($2.99/month) removes the daily
+> limit and supports larger files. No software installation required; works in
+> any modern desktop or mobile browser. Files are sent over an encrypted
+> connection, are never made public, and temporary files are deleted
+> automatically after conversion.
+
+## Converter
+
+- [PDF to Word converter](https://pdf2wordly.com/): Upload a PDF, convert it, download an editable .docx. Login required.
+- [Scanned PDF to Word with OCR](https://pdf2wordly.com/scanned-pdf-to-word.html): Image-only PDFs rebuilt as editable text via OCR (English, French, Arabic).
+
+## Guides
+
+- [How to convert PDF to Word](https://pdf2wordly.com/how-to-convert-pdf-to-word.html): Three-step workflow: upload, convert, download.
+- [PDF to Word without losing formatting](https://pdf2wordly.com/pdf-to-word-without-losing-formatting.html): What carries over cleanly (text, tables, images) and what may need a touch-up.
+- [Convert multiple PDF files to Word](https://pdf2wordly.com/convert-multiple-pdf-files-to-word.html): One-at-a-time workflow, 25 MB per-file limit, Pro for daily volume.
+- [PDF to Word on Mac and mobile](https://pdf2wordly.com/pdf-to-word-on-mac-and-mobile.html): Browser-based conversion on macOS, iPhone, and Android.
+- [PDF to Word troubleshooting](https://pdf2wordly.com/pdf-to-word-not-working.html): Failed conversions, file-size and file-type errors, login and quota issues.
+- [Password-protected PDFs](https://pdf2wordly.com/unlock-password-protected-pdf-to-word.html): Locked files must be unlocked by their owner before converting; the service cannot bypass encryption.
+- [PDF resume to Word](https://pdf2wordly.com/pdf-to-word-resume.html): When job portals require .docx and how layout survives conversion.
+- [PDF tables and business documents](https://pdf2wordly.com/pdf-to-word-tables-and-business-documents.html): Tables, invoices, and reports; when a spreadsheet is the better target.
+
+## Comparisons
+
+- [Alternative to iLovePDF](https://pdf2wordly.com/pdf-to-word-alternative-to-ilovepdf.html): Focused PDF-to-Word conversion without sign-up or watermark for the core task.
+- [Alternative to Smallpdf](https://pdf2wordly.com/pdf-to-word-vs-smallpdf.html): Scope, account requirements, OCR support, and pricing compared.
+
+## Company
+
+- [About PDF2Wordly](https://pdf2wordly.com/about.html): What the product is, who it is for, features, and privacy approach.
+- [Contact](https://pdf2wordly.com/contact.html): Help topics for conversion, account/billing, and privacy questions.
+- [Privacy Policy](https://pdf2wordly.com/privacy.html): Data collection, retention, rights, and contact details.
+
+## Notes for automated readers
+
+- Conversion requires a logged-in account; every conversion request carries the user's auth token and the server enforces Free vs Pro limits.
+- Free tier: one successful conversion per rolling 24 hours counts against quota (failed conversions do not consume it); 25 MB max file size.
+- Only genuine PDF files are accepted (validated server-side, not just by extension).
+- The service does not remove password protection from PDFs and does not bypass encryption.
+- PDF2Wordly is an online SaaS with no physical locations, phone support, or local offices.
