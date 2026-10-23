@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
-
-  <!-- Homepages (EN / FR / AR) -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://pdf2wordly.com/</loc>
     <lastmod>2026-09-14</lastmod>
@@ -11,7 +8,6 @@
     <xhtml:link rel="alternate" hreflang="ar" href="https://pdf2wordly.com/ar/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pdf2wordly.com/"/>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/fr/</loc>
     <lastmod>2026-09-14</lastmod>
@@ -20,7 +16,6 @@
     <xhtml:link rel="alternate" hreflang="ar" href="https://pdf2wordly.com/ar/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pdf2wordly.com/"/>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/ar/</loc>
     <lastmod>2026-09-14</lastmod>
@@ -29,77 +24,60 @@
     <xhtml:link rel="alternate" hreflang="ar" href="https://pdf2wordly.com/ar/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pdf2wordly.com/"/>
   </url>
-
-  <!-- Guides and use-case pages -->
   <url>
     <loc>https://pdf2wordly.com/scanned-pdf-to-word.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/how-to-convert-pdf-to-word.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/pdf-to-word-without-losing-formatting.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/pdf-to-word-tables-and-business-documents.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/pdf-to-word-resume.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/convert-multiple-pdf-files-to-word.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/pdf-to-word-on-mac-and-mobile.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/pdf-to-word-alternative-to-ilovepdf.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/pdf-to-word-vs-smallpdf.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/unlock-password-protected-pdf-to-word.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/pdf-to-word-not-working.html</loc>
     <lastmod>2026-09-23</lastmod>
   </url>
-
-  <!-- Trust pages -->
   <url>
     <loc>https://pdf2wordly.com/about.html</loc>
     <lastmod>2026-09-24</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/contact.html</loc>
     <lastmod>2026-09-24</lastmod>
   </url>
-
   <url>
     <loc>https://pdf2wordly.com/privacy.html</loc>
     <lastmod>2026-09-14</lastmod>
   </url>
-
 </urlset>
