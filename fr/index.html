@@ -7,6 +7,7 @@
 <script>try{var t=localStorage.getItem('pdftoword-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <title>Convertisseur PDF en Word gratuit en ligne | PDF2Wordly</title>
 <meta name="description" content="Convertissez un PDF en Word en ligne gratuitement avec PDF2Wordly. Importez votre PDF et obtenez un document Word modifiable rapidement et en toute sécurité.">
+<meta property="og:site_name" content="PDF2Wordly">
 <link rel="canonical" href="https://pdf2wordly.com/fr/">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
@@ -173,7 +174,7 @@
 {
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "PDFtoWord",
+  "name": "PDF2Wordly",
   "url": "https://pdf2wordly.com/",
   "logo": "https://pdf2wordly.com/favicon.ico"
 }
@@ -184,7 +185,7 @@
 {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  "name": "PDFtoWord",
+  "name": "PDF2Wordly",
   "url": "https://pdf2wordly.com/"
 }
 </script>
@@ -197,15 +198,15 @@
 <!-- ============ HEADER ============ -->
 <header class="site-header">
   <div class="header-inner">
-    <a href="#top" class="logo" aria-label="Accueil PDFtoWord">
+    <a href="#top" class="logo" aria-label="Accueil PDF2Wordly">
       <span class="logo-mark" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="1.5" width="15" height="20" rx="2" fill="var(--accent-pdf)"/>
-          <rect x="8" y="4.5" width="15" height="20" rx="2" fill="var(--primary)"/>
+          <rect x="3" y="1.5" width="15" height="20" rx="2" fill="var(--brand-pdf)"/>
+          <rect x="8" y="4.5" width="15" height="20" rx="2" fill="var(--brand-blue)"/>
           <path d="M11 9h9M11 13h9M11 17h6" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
         </svg>
       </span>
-      <span class="logo-text">PDF<span class="logo-accent">to</span>Word</span>
+      <span class="logo-text"><span class="logo-pdf">PDF</span><span class="logo-two">2</span><span class="logo-wordly">Wordly</span></span>
     </a>
 
     <nav class="main-nav" aria-label="Navigation principale">
@@ -226,7 +227,7 @@
 
       <!-- Logged-out state -->
       <a href="../login.html" class="btn btn-ghost" id="loginLink">Connexion</a>
-   <a href="#" class="btn btn-primary btn-full get-pro-btn">Passer à Pro</a>
+   <a href="#pricing" class="btn btn-primary btn-full">Passer à Pro</a>
       <!-- Logged-in state (hidden until a real Supabase session is found) -->
       <div class="profile-chip" id="profileChip" data-active="false">
         <span class="profile-avatar" id="profileAvatar">U</span>
@@ -369,6 +370,20 @@
           <p class="error-sub">Veuillez réessayer.</p>
           <button type="button" class="btn btn-primary btn-full" id="retryBtn">Réessayer</button>
         </div>
+        <div class="tool-state" id="stateLimit" data-state="limit" hidden>
+          <div class="limit-icon" aria-hidden="true">
+            <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+              <circle cx="26" cy="26" r="25" fill="var(--primary-tint)"/>
+              <path d="M18 14h16M18 38h16M20 14c0 6 4 8 6 12-2 4-6 6-6 12M32 14c0 6-4 8-6 12 2 4 6 6 6 12" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <p class="limit-title">Vous avez utilisé votre conversion gratuite du jour</p>
+          <p class="limit-countdown" id="limitCountdown" role="timer" data-template="Prochaine conversion gratuite dans {h} h {m} min" data-fallback="Votre prochaine conversion gratuite sera disponible d'ici 24 heures."></p>
+          <div class="limit-actions">
+            <a href="#pricing" class="btn btn-primary btn-full">Voir les offres Pro</a>
+            <button type="button" class="btn btn-secondary btn-full" id="limitBackBtn">Retour</button>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -486,15 +501,13 @@
         <div class="price-card price-card-featured">
           <p class="price-badge">Le plus populaire</p>
           <h3>Pro</h3>
-          <p class="price-amount">2.99 €<span>/mois</span></p>
+          <p class="price-amount">$2.99<span>/mois</span></p>
           <ul class="price-features">
             <li>Conversions illimitées</li>
-            <li>Fichiers plus volumineux</li>
-            <li>Conversion par lot</li>
-            <li>Sans publicité</li>
-            <li>Traitement prioritaire</li>
+            <li>Jusqu'à 200 pages par fichier</li>
+            <li>OCR pour les PDF scannés (arabe, français, anglais)</li>
           </ul>
-          <a href="#" class="btn btn-primary btn-full">Passer à Pro</a>
+          <span class="btn btn-secondary btn-full is-disabled" aria-disabled="true">Pro arrive bientôt</span>
         </div>
       </div>
     </div>
@@ -601,7 +614,7 @@
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-brand">
-      <span class="logo-text">PDF<span class="logo-accent">to</span>Word</span>
+      <span class="logo-text"><span class="logo-pdf">PDF</span><span class="logo-two">2</span><span class="logo-wordly">Wordly</span></span>
       <p>Convertissez vos fichiers PDF en documents Word modifiables, dans votre navigateur.</p>
     </div>
 
@@ -636,7 +649,7 @@
     </div>
   </div>
   <div class="footer-bottom">
-    <p>&copy; <span id="year"></span> PDFtoWord. Tous droits réservés.</p>
+    <p>&copy; <span id="year"></span> PDF2Wordly. Tous droits réservés.</p>
   </div>
 </footer>
 

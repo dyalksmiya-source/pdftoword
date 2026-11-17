@@ -7,6 +7,7 @@
 <script>try{var t=localStorage.getItem('pdftoword-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <title>Convert Scanned PDF to Word Online (Free OCR) | PDF2Wordly</title>
 <meta name="description" content="Turn a scanned or image-only PDF into an editable Word document with built-in OCR. Works with English, French, and Arabic scans. Free, fast, and no installation.">
+<meta property="og:site_name" content="PDF2Wordly">
 <link rel="canonical" href="https://pdf2wordly.com/scanned-pdf-to-word.html">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
@@ -187,15 +188,15 @@
 <!-- ============ HEADER ============ -->
 <header class="site-header">
   <div class="header-inner">
-    <a href="index.html" class="logo" aria-label="PDFtoWord home">
+    <a href="index.html" class="logo" aria-label="PDF2Wordly home">
       <span class="logo-mark" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="1.5" width="15" height="20" rx="2" fill="var(--accent-pdf)"/>
-          <rect x="8" y="4.5" width="15" height="20" rx="2" fill="var(--primary)"/>
+          <rect x="3" y="1.5" width="15" height="20" rx="2" fill="var(--brand-pdf)"/>
+          <rect x="8" y="4.5" width="15" height="20" rx="2" fill="var(--brand-blue)"/>
           <path d="M11 9h9M11 13h9M11 17h6" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
         </svg>
       </span>
-      <span class="logo-text">PDF<span class="logo-accent">to</span>Word</span>
+      <span class="logo-text"><span class="logo-pdf">PDF</span><span class="logo-two">2</span><span class="logo-wordly">Wordly</span></span>
     </a>
 
     <nav class="main-nav" aria-label="Primary">
@@ -213,7 +214,7 @@
         <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>
       </button>
       <a href="login.html" class="btn btn-ghost" id="loginLink">Log in</a>
-      <a href="#" class="btn btn-primary btn-small get-pro-btn">Get Pro</a>
+      <a href="index.html#pricing" class="btn btn-primary btn-small">Get Pro</a>
 
       <!-- Logged-in state (hidden until a real Supabase session is found) -->
       <div class="profile-chip" id="profileChip" data-active="false">
@@ -364,6 +365,20 @@
           <p class="error-title">Something went wrong while converting your file.</p>
           <p class="error-sub">Please try again.</p>
           <button type="button" class="btn btn-primary btn-full" id="retryBtn">Try again</button>
+        </div>
+        <div class="tool-state" id="stateLimit" data-state="limit" hidden>
+          <div class="limit-icon" aria-hidden="true">
+            <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+              <circle cx="26" cy="26" r="25" fill="var(--primary-tint)"/>
+              <path d="M18 14h16M18 38h16M20 14c0 6 4 8 6 12-2 4-6 6-6 12M32 14c0 6-4 8-6 12 2 4 6 6 6 12" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <p class="limit-title">You've used today's free conversion</p>
+          <p class="limit-countdown" id="limitCountdown" role="timer" data-template="Your next free conversion in {h}h {m}m" data-fallback="Your next free conversion will be available within 24 hours."></p>
+          <div class="limit-actions">
+            <a href="index.html#pricing" class="btn btn-primary btn-full">See Pro plans</a>
+            <button type="button" class="btn btn-secondary btn-full" id="limitBackBtn">Back</button>
+          </div>
         </div>
       </div>
     </div>
@@ -542,7 +557,7 @@
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-brand">
-      <span class="logo-text">PDF<span class="logo-accent">to</span>Word</span>
+      <span class="logo-text"><span class="logo-pdf">PDF</span><span class="logo-two">2</span><span class="logo-wordly">Wordly</span></span>
       <p>Convert PDF files to editable Word documents, in your browser.</p>
     </div>
 
@@ -594,7 +609,7 @@
     </div>
   </div>
   <div class="footer-bottom">
-    <p>&copy; <span id="year"></span> PDFtoWord. All rights reserved.</p>
+    <p>&copy; <span id="year"></span> PDF2Wordly. All rights reserved.</p>
   </div>
 </footer>
 

@@ -7,6 +7,7 @@
 <script>try{var t=localStorage.getItem('pdftoword-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
 <title>Convert a PDF Resume to Word (For Job Applications) | PDF2Wordly</title>
 <meta name="description" content="Some job applications and ATS systems need a Word resume, not PDF. See when to convert, how to keep your layout intact, and how to do it in under a minute.">
+<meta property="og:site_name" content="PDF2Wordly">
 <link rel="canonical" href="https://pdf2wordly.com/pdf-to-word-resume.html">
 <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
@@ -54,7 +55,7 @@
     {
       "@type": "Question",
       "name": "Can I convert my resume without creating an account?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Yes. Upload your PDF resume and download the converted Word file without signing up or logging in." }
+      "acceptedAnswer": { "@type": "Answer", "text": "No. A free account is required: sign in, then upload your PDF resume and download the converted Word file." }
     }
   ]
 }
@@ -128,15 +129,15 @@
 
 <header class="site-header">
   <div class="header-inner">
-    <a href="index.html#top" class="logo" aria-label="PDFtoWord home">
+    <a href="index.html#top" class="logo" aria-label="PDF2Wordly home">
       <span class="logo-mark" aria-hidden="true">
         <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="1.5" width="15" height="20" rx="2" fill="var(--accent-pdf)"/>
-          <rect x="8" y="4.5" width="15" height="20" rx="2" fill="var(--primary)"/>
+          <rect x="3" y="1.5" width="15" height="20" rx="2" fill="var(--brand-pdf)"/>
+          <rect x="8" y="4.5" width="15" height="20" rx="2" fill="var(--brand-blue)"/>
           <path d="M11 9h9M11 13h9M11 17h6" stroke="white" stroke-width="1.4" stroke-linecap="round"/>
         </svg>
       </span>
-      <span class="logo-text">PDF<span class="logo-accent">to</span>Word</span>
+      <span class="logo-text"><span class="logo-pdf">PDF</span><span class="logo-two">2</span><span class="logo-wordly">Wordly</span></span>
     </a>
 
     <nav class="main-nav" aria-label="Primary">
@@ -155,7 +156,7 @@
       </button>
 
       <a href="login.html" class="btn btn-ghost" id="loginLink">Log in</a>
-      <a href="#" class="btn btn-primary btn-small get-pro-btn">Get Pro</a>
+      <a href="index.html#pricing" class="btn btn-primary btn-small">Get Pro</a>
 
       <div class="profile-chip" id="profileChip" data-active="false">
         <span class="profile-avatar" id="profileAvatar">U</span>
@@ -261,7 +262,7 @@
           <div class="legal-section" id="convert-steps">
             <h2>Converting your resume</h2>
             <ol class="legal-list ol-numbered">
-              <li><strong>Upload your PDF resume.</strong> Drag it into the converter or choose it from your device — no account needed.</li>
+              <li><strong>Upload your PDF resume.</strong> Drag it into the converter or choose it from your device after signing in to your free account.</li>
               <li><strong>Convert to Word.</strong> The tool rebuilds your text, headings, and spacing as an editable .docx.</li>
               <li><strong>Download and open it.</strong> Check it in Word, Google Docs, or whatever the application portal expects.</li>
             </ol>
@@ -288,7 +289,7 @@
             <p>For resumes built from a simple single-column layout, formatting typically carries over well. Resumes with heavy multi-column layouts, icons, or graphic design elements are more likely to need small manual adjustments after conversion — check the result before submitting.</p>
 
             <h3 style="font-size:16px;margin-bottom:8px;">Can I convert my resume without creating an account?</h3>
-            <p>Yes. Upload your PDF resume and download the converted Word file without signing up or logging in.</p>
+            <p>No. A free account is required: sign in, then upload your PDF resume and download the converted Word file.</p>
           </div>
 
         </article>
@@ -301,7 +302,7 @@
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-brand">
-      <span class="logo-text">PDF<span class="logo-accent">to</span>Word</span>
+      <span class="logo-text"><span class="logo-pdf">PDF</span><span class="logo-two">2</span><span class="logo-wordly">Wordly</span></span>
       <p>Convert PDF files to editable Word documents, in your browser.</p>
     </div>
 
@@ -324,7 +325,7 @@
         <li><a href="unlock-password-protected-pdf-to-word.html">Unlock a Password-Protected PDF</a></li>
         <li><a href="pdf-to-word-tables-and-business-documents.html">PDF Tables &amp; Business Documents</a></li>
  
-        <li><a href="/">Free Converter, No Sign-Up</a></li>
+        <li><a href="/">Free PDF to Word Converter</a></li>
       </ul>
     </div>
 
@@ -344,7 +345,7 @@
     </div>
   </div>
   <div class="footer-bottom">
-    <p>&copy; <span id="year"></span> PDFtoWord. All rights reserved.</p>
+    <p>&copy; <span id="year"></span> PDF2Wordly. All rights reserved.</p>
   </div>
 </footer>
 
