@@ -28,6 +28,7 @@ Run:
 import logging
 import os
 import tempfile
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,6 +74,14 @@ MAX_CONTENT_LENGTH = 25 * 1024 * 1024  # 25 MB, matches the frontend limit
 MIN_CHARS_PER_PAGE = 20
 OCR_ZOOM = 2.0
 OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+fra+ara")
+
+# Max pages per request, checked before conversion.
+FREE_MAX_PAGES = 20
+PRO_MAX_PAGES = 200
+
+# Temp files older than this are purged (startup + before each conversion).
+TEMP_DIR = Path(tempfile.gettempdir()) / "pdf2wordly"
+TEMP_MAX_AGE_SECONDS = 30 * 60
 
 # Plans / statuses treated as Pro. Centralized here — the single definition.
 PRO_PLANS = {"pro"}
@@ -171,6 +180,41 @@ def cleanup_files(*paths):
                 os.remove(path)
         except OSError as exc:
             logger.warning("Could not remove temp file %s: %s", path, exc)
+
+
+def purge_old_temp_files(max_age=TEMP_MAX_AGE_SECONDS):
+    """Delete files in TEMP_DIR last modified more than `max_age` seconds ago."""
+    if not TEMP_DIR.is_dir():
+        return
+    cutoff = time.time() - max_age
+    try:
+        entries = list(TEMP_DIR.iterdir())
+    except OSError as exc:
+        logger.warning("Could not list temp dir %s: %s", TEMP_DIR, exc)
+        return
+    for entry in entries:
+        try:
+            if entry.is_file() and entry.stat().st_mtime < cutoff:
+                entry.unlink()
+        except OSError as exc:
+            logger.warning("Could not purge temp file %s: %s", entry, exc)
+
+
+def check_pdf_limits(pdf_path, max_pages):
+    """Return (code, extra) if the PDF is rejected, else (None, None).
+
+    Raises if PyMuPDF cannot open the file at all.
+    """
+    doc = fitz.open(pdf_path)
+    try:
+        if doc.needs_pass:
+            return "PASSWORD_REQUIRED", None
+        if doc.page_count > max_pages:
+            return "PAGE_LIMIT_EXCEEDED", {"max_pages": max_pages,
+                                           "pages": doc.page_count}
+        return None, None
+    finally:
+        doc.close()
 
 
 def pdf_is_scanned(pdf_path):
@@ -346,9 +390,10 @@ def convert():
 
     # 5. Store upload in a safe temp dir under a random name; verify magic bytes.
     job_id = uuid.uuid4().hex
-    tmp_dir = Path(tempfile.gettempdir()) / "pdf2wordly"
+    tmp_dir = TEMP_DIR
     try:
         tmp_dir.mkdir(parents=True, exist_ok=True)
+        purge_old_temp_files()
     except OSError:
         logger.exception("Could not create temp dir")
         if claimed:
@@ -372,14 +417,28 @@ def convert():
             return jsonify({"code": "CONVERSION_FAILED",
                             "error": "Please upload a valid PDF file."}), 400
         try:
-            probe = fitz.open(input_path)
-            probe.close()
+            reject_code, reject_extra = check_pdf_limits(
+                input_path, PRO_MAX_PAGES if pro else FREE_MAX_PAGES)
         except Exception:
             cleanup_files(input_path)
             if claimed:
                 _release_claim(admin, user_id, claim_prev)
             return jsonify({"code": "CONVERSION_FAILED",
                             "error": "We couldn't read this PDF. Please try another file."}), 400
+        if reject_code:
+            cleanup_files(input_path)
+            if claimed:
+                _release_claim(admin, user_id, claim_prev)
+            if reject_code == "PASSWORD_REQUIRED":
+                payload = {"code": "PASSWORD_REQUIRED",
+                           "error": ("This PDF is password-protected. Remove the "
+                                     "password, then upload it again.")}
+            else:
+                payload = {"code": "PAGE_LIMIT_EXCEEDED",
+                           "error": (f"This PDF has too many pages. The limit is "
+                                     f"{reject_extra['max_pages']} pages per file."),
+                           **reject_extra}
+            return jsonify(payload), 400
 
         try:
             size = os.path.getsize(input_path)
@@ -417,6 +476,13 @@ def _release_claim(admin, user_id, previous):
                   {"p_user_id": user_id, "p_previous": previous}).execute()
     except Exception:
         logger.exception("Failed to release free-conversion claim")
+
+
+# Runs once per gunicorn worker at import time.
+try:
+    purge_old_temp_files()
+except Exception:
+    logger.exception("Startup temp purge failed")
 
 
 @app.errorhandler(413)

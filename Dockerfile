@@ -16,7 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV PORT=5001
-EXPOSE 5001
-
-CMD ["gunicorn", "-b", "0.0.0.0:5001", "--timeout", "120", "server:app"]
+# Railway injects PORT at runtime; 8080 matches the public domain target port.
+# 2 workers x 1 thread keeps OCR memory under the 2 GB limit.
+CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --threads 1 --timeout 300 --graceful-timeout 30 server:app
