@@ -14,7 +14,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="dns-prefetch" href="https://pdftoword-production-94af.up.railway.app">
-<link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
@@ -69,6 +68,7 @@
         <div class="profile-menu" id="profileMenu" hidden>
           <p class="profile-menu-email" id="profileMenuEmail"></p>
           <p class="account-plan"><span>Plan</span> <span class="plan-badge" data-plan-badge hidden></span></p>
+          <a href="account.html" class="account-menu-link">Account settings</a>
           <button type="button" id="logoutBtn">Log out</button>
         </div>
       </div>
@@ -106,7 +106,7 @@
     <div class="section-inner">
       <p class="eyebrow">Legal</p>
       <h1>Privacy Policy</h1>
-      <p class="hero-sub">Last updated: <span id="lastUpdated">August 22, 2026</span></p>
+      <p class="hero-sub">Last updated: <span id="lastUpdated">November 18, 2026</span></p>
     </div>
   </section>
 
@@ -124,8 +124,10 @@
           <li><a href="#how-we-use-data">How we use data</a></li>
           <li><a href="#cookies">Cookies</a></li>
           <li><a href="#sharing">Sharing of information</a></li>
+          <li><a href="#service-providers">Service providers</a></li>
           <li><a href="#security">Security</a></li>
           <li><a href="#retention">Data retention</a></li>
+          <li><a href="#account-deletion">Account deletion</a></li>
           <li><a href="#your-rights">Your rights</a></li>
           <li><a href="#children">Children's privacy</a></li>
           <li><a href="#changes">Changes to this policy</a></li>
@@ -137,14 +139,14 @@
 
         <article id="overview" class="legal-section">
           <h2>Overview</h2>
-          <p>PDF2Wordly ("we", "us", or "our") provides an online tool that converts PDF files into editable Word documents. This Privacy Policy explains what information we collect, how we use it, and the choices you have. By using our website and converter, you agree to the practices described here.</p>
+          <p>PDF2Wordly ("we", "us", or "our") is operated by <span data-config="legal-name">[LEGAL NAME]</span> and provides an online tool that converts PDF files into editable Word documents. This Privacy Policy explains what information we collect, how we use it, and the choices you have. By using our website and converter, you agree to the practices described here.</p>
         </article>
 
         <article id="data-we-collect" class="legal-section">
           <h2>Data we collect</h2>
           <p>We aim to collect only what's needed to run the service and improve it.</p>
           <ul class="legal-list">
-            <li><strong>Account information</strong> — if you create an account or subscribe to Pro, we collect your email address and basic billing details handled by our payment processor.</li>
+            <li><strong>Account information</strong> — when you create an account we store your email address, your plan and the time of your last free conversion. If you subscribe to Pro, payment details are collected and handled by Paddle (see Service providers); we receive only your subscription status and dates, never your full card details.</li>
             <li><strong>Files you upload</strong> — the PDF you convert, and the resulting Word document, are processed as described in "Your files" below.</li>
             <li><strong>Usage data</strong> — pages visited, browser type, device type, and general interaction data, collected automatically to help us understand how the tool is used.</li>
             <li><strong>Technical data</strong> — IP address and similar identifiers, used for security, fraud prevention, and rate limiting on free conversions.</li>
@@ -154,7 +156,7 @@
         <article id="your-files" class="legal-section">
           <h2>Your files</h2>
           <p>The PDF you upload is transmitted over an encrypted connection and processed solely to produce your Word document. We do not review, read, or use the content of your files for any purpose other than performing the conversion you requested.</p>
-          <p>Uploaded files and converted output are not made publicly accessible, and temporary copies are automatically deleted from our servers shortly after processing completes or after a short expiry window, whichever comes first.</p>
+          <p>Uploaded files and converted output are not made publicly accessible. They are deleted from our servers right after the conversion, and any leftover temporary copy is deleted automatically within 30 minutes.</p>
         </article>
 
         <article id="how-we-use-data" class="legal-section">
@@ -179,9 +181,19 @@
           <h2>Sharing of information</h2>
           <p>We do not sell your personal information. We may share limited data with:</p>
           <ul class="legal-list">
-            <li><strong>Service providers</strong> who help us host the site, process payments, or deliver the conversion infrastructure, under confidentiality obligations</li>
+            <li><strong>Service providers</strong> listed below, only as needed to run the service</li>
             <li><strong>Legal authorities</strong> when required to comply with a legal obligation, protect our rights, or ensure user safety</li>
             <li><strong>A successor entity</strong> in the event of a merger, acquisition, or sale of assets, subject to the same privacy commitments</li>
+          </ul>
+        </article>
+
+        <article id="service-providers" class="legal-section">
+          <h2>Service providers</h2>
+          <ul class="legal-list">
+            <li><strong>Supabase</strong>: user accounts and sign-in (email address, plan, subscription status).</li>
+            <li><strong>Railway</strong>: hosts the conversion server that processes your files. Files are deleted right after the conversion, and within 30 minutes at most.</li>
+            <li><strong>Paddle</strong>: payments for Pro. Paddle is our Merchant of Record: it processes payments, taxes, invoices and refunds, and handles your payment details under its own privacy policy.</li>
+            <li><strong>GitHub Pages</strong>: hosts this website.</li>
           </ul>
         </article>
 
@@ -192,12 +204,17 @@
 
         <article id="retention" class="legal-section">
           <h2>Data retention</h2>
-          <p>Uploaded and converted files are retained only briefly, long enough to complete the conversion and allow you to download the result, and are then automatically deleted. Account information is retained for as long as your account is active, or as needed to comply with legal obligations, resolve disputes, and enforce our agreements.</p>
+          <p>Uploaded and converted files are deleted right after the conversion, and within 30 minutes at most. Account information is kept while your account exists. If you cancel Pro, your account and its data are kept and the account returns to the Free plan. Payment records are kept by Paddle as required by tax law.</p>
+        </article>
+
+        <article id="account-deletion" class="legal-section">
+          <h2>Account deletion</h2>
+          <p>You can ask us to delete your account at any time. Deletion from the <a href="account.html">Account settings</a> page is coming soon; until then, email <a data-config="support-email" href="mailto:support@pdf2wordly.com">support@pdf2wordly.com</a> from the address of your account. Deleting your account permanently removes your account data (email address, plan and usage information). Please cancel an active Pro subscription first.</p>
         </article>
 
         <article id="your-rights" class="legal-section">
           <h2>Your rights</h2>
-          <p>Depending on where you live, you may have the right to access, correct, delete, or export your personal data, and to object to or restrict certain processing. To exercise any of these rights, contact us using the details below.</p>
+          <p>Depending on where you live, you may have the right to access, correct, delete, or export your personal data, and to object to or restrict certain processing. To exercise any of these rights, email <a data-config="support-email" href="mailto:support@pdf2wordly.com">support@pdf2wordly.com</a>. We reply <span data-config="reply-time">within 2 business days</span>.</p>
         </article>
 
         <article id="children" class="legal-section">
@@ -212,7 +229,7 @@
 
         <article id="contact" class="legal-section">
           <h2>Contact us</h2>
-          <p>If you have questions about this Privacy Policy or how your data is handled, see the <a href="contact.html">Contact page</a> for how to reach us.</p>
+          <p>Questions about this Privacy Policy or your data: <a data-config="support-email" href="mailto:support@pdf2wordly.com">support@pdf2wordly.com</a>. The service is operated by <span data-config="legal-name">[LEGAL NAME]</span>. See also the <a href="contact.html">Contact page</a>.</p>
         </article>
 
       </div>
@@ -277,6 +294,7 @@
     </div>
   </div>
   <div class="footer-bottom">
+    <nav class="footer-legal" aria-label="Legal"><a href="index.html#pricing">Pricing</a><a href="terms.html">Terms</a><a href="refund-policy.html">Refund Policy</a><a href="privacy.html">Privacy</a><a href="contact.html">Contact</a></nav>
     <p>&copy; <span id="year"></span> PDF2Wordly. All rights reserved.</p>
   </div>
 </footer>

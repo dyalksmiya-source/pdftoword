@@ -27,7 +27,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="dns-prefetch" href="https://pdftoword-production-94af.up.railway.app">
-<link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
@@ -121,6 +120,7 @@
         <div class="profile-menu" id="profileMenu" hidden>
           <p class="profile-menu-email" id="profileMenuEmail"></p>
           <p class="account-plan"><span>Plan</span> <span class="plan-badge" data-plan-badge hidden></span></p>
+          <a href="account.html" class="account-menu-link">Account settings</a>
           <button type="button" id="logoutBtn">Log out</button>
         </div>
       </div>
@@ -177,6 +177,7 @@
           <ul>
             <li><a href="#conversion-help">Conversion help</a></li>
             <li><a href="#account-billing">Account and billing</a></li>
+            <li><a href="#refund-requests">Refund requests</a></li>
             <li><a href="#privacy-requests">Privacy requests</a></li>
             <li><a href="#direct-contact">Direct contact</a></li>
           </ul>
@@ -191,9 +192,13 @@
 
           <div class="legal-section" id="account-billing">
             <h2>Account and billing</h2>
-            <p>For sign-in trouble, use the <a href="forgot-password.html">password reset</a> page. Pro is coming soon. The <a href="index.html#pricing">pricing section</a> will show the details as soon as it is available.</p>
+            <p>For sign-in trouble, use the <a href="forgot-password.html">password reset</a> page. Pro is coming soon; the <a href="index.html#pricing">pricing section</a> shows what it includes. Your plan and subscription are on your <a href="account.html">Account settings</a> page.</p>
           </div>
 
+          <div class="legal-section" id="refund-requests">
+            <h2>Refund requests</h2>
+            <p>You can get a full refund within <span data-config="refund-days">14</span> days of any payment, with no conditions. Email <a data-config="support-email" href="mailto:support@pdf2wordly.com">support@pdf2wordly.com</a> with the email address of your account and, if you have it, the order number from your Paddle receipt. Paddle, our Merchant of Record, sends the money back to your original payment method. Details: <a href="refund-policy.html">Refund Policy</a>.</p>
+          </div>
           <div class="legal-section" id="privacy-requests">
             <h2>Privacy requests</h2>
             <p>Questions about your data — access, correction, deletion, or export — are covered in the <a href="privacy.html">Privacy Policy</a>, including what is stored and for how long. Converted files are deleted automatically after processing; they are never made public.</p>
@@ -201,10 +206,7 @@
 
           <div class="legal-section" id="direct-contact">
             <h2>Direct contact</h2>
-            <!-- OWNER NOTE: no public support address exists yet. When one is created,
-                 replace the paragraph below with a real mailto: link. Do not ship a
-                 placeholder address. -->
-            <p>A dedicated support email address has not been published yet. Until it is, the guides above are the fastest way to resolve an issue, and privacy questions can be raised through the process described in the <a href="privacy.html#contact">Privacy Policy</a>.</p>
+            <p>Email us at <a data-config="support-email" href="mailto:support@pdf2wordly.com">support@pdf2wordly.com</a>. We reply <span data-config="reply-time">within 2 business days</span>. Please write from the email address of your PDF2Wordly account when your question is about your account or a payment.</p>
             <div class="article-cta">
               <a href="index.html#converter" class="btn btn-primary btn-large">Convert a PDF now</a>
             </div>
@@ -268,6 +270,7 @@
     </div>
   </div>
   <div class="footer-bottom">
+    <nav class="footer-legal" aria-label="Legal"><a href="index.html#pricing">Pricing</a><a href="terms.html">Terms</a><a href="refund-policy.html">Refund Policy</a><a href="privacy.html">Privacy</a><a href="contact.html">Contact</a></nav>
     <p>&copy; <span id="year"></span> PDF2Wordly. All rights reserved.</p>
   </div>
 </footer>
@@ -354,27 +357,6 @@
 </script>
 
 
-<script>
-(function () {
-  'use strict';
-  const LEMON_CHECKOUT_URL =
-    'https://pdf2wordly.lemonsqueezy.com/checkout/buy/539e71b2-9f13-4f62-89c3-053c690074b9';
-  const getProButtons = document.querySelectorAll('.get-pro-btn');
-
-  async function handleGetPro(e) {
-    e.preventDefault();
-    const { data, error } = await window.__supabaseClient.auth.getSession();
-    if (error) { console.error('Auth error:', error); alert('Something went wrong. Please try again.'); return; }
-    const session = data?.session;
-    if (!session?.user) { window.location.href = 'login.html'; return; }
-    const userId = session.user.id;
-    const checkoutUrl = LEMON_CHECKOUT_URL + '?checkout[custom][supabase_user_id]=' + encodeURIComponent(userId);
-    window.open(checkoutUrl, '_blank');
-  }
-
-  getProButtons.forEach(button => button.addEventListener('click', handleGetPro));
-})();
-</script>
 
 <script src="header-menus.js" defer></script>
 </body>

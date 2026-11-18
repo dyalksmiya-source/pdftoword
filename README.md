@@ -13,8 +13,7 @@ with `pdf2docx` (OCR fallback for scanned PDFs).
 | Frontend | GitHub Pages → `https://pdf2wordly.com` |
 | Backend  | Railway (Flask, `server.py`, `Dockerfile`) |
 | Auth + DB| Supabase (`public.profiles`, RLS, trigger) |
-| Payments | Lemon Squeezy (Pro Monthly $2.99)       |
-| Webhook  | Supabase Edge Function `lemonsqueezy-webhook` |
+| Payments | Paddle, Merchant of Record (Pro Monthly $2.99), not live yet |
 
 ## Run it locally
 
@@ -52,15 +51,11 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
 3. **Railway env vars** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY` (plus optional `EXTRA_CORS_ORIGINS`,
    `OCR_LANGUAGES`). No code change needed besides the frontend backend URL.
-4. **Edge Function** — `supabase functions deploy lemonsqueezy-webhook`,
-   then set secrets `LEMONSQUEEZY_WEBHOOK_SECRET`,
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
-5. **Lemon Squeezy** — product *PDF2Wordly Pro*, variant
-   *PDF2Wordly Pro Monthly* ($2.99/month, buy-link UUID
-   `539e71b2-9f13-4f62-89c3-053c690074b9` — already wired in the frontend);
-   webhook URL `https://<project-ref>.supabase.co/functions/v1/lemonsqueezy-webhook`
-   subscribed to all `subscription_*` events; custom field
-   `supabase_user_id` is attached automatically by the checkout code.
+4. **Payments** — Paddle (Merchant of Record) is being set up; checkout and the
+   subscription webhook will be added once Paddle approves the domain.
+5. **Site values** — legal name, support email, price, refund days and reply
+   time live in `_tools/site-config.json`; run `python _tools/apply_site_config.py`
+   after changing them.
 
 ## API
 

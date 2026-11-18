@@ -29,7 +29,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="dns-prefetch" href="https://pdftoword-production-94af.up.railway.app">
-<link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="style.css">
@@ -179,6 +178,7 @@
         <div class="profile-menu" id="profileMenu" hidden>
           <p class="profile-menu-email" id="profileMenuEmail"></p>
           <p class="account-plan"><span>Plan</span> <span class="plan-badge" data-plan-badge hidden></span></p>
+          <a href="account.html" class="account-menu-link">Account settings</a>
           <button type="button" id="logoutBtn">Log out</button>
         </div>
       </div>
@@ -389,6 +389,7 @@
     </div>
   </div>
   <div class="footer-bottom">
+    <nav class="footer-legal" aria-label="Legal"><a href="index.html#pricing">Pricing</a><a href="terms.html">Terms</a><a href="refund-policy.html">Refund Policy</a><a href="privacy.html">Privacy</a><a href="contact.html">Contact</a></nav>
     <p>&copy; <span id="year"></span> PDF2Wordly. All rights reserved.</p>
   </div>
 </footer>
@@ -477,27 +478,6 @@
 </script>
 
 
-<script>
-(function () {
-  'use strict';
-  const LEMON_CHECKOUT_URL =
-    'https://pdf2wordly.lemonsqueezy.com/checkout/buy/539e71b2-9f13-4f62-89c3-053c690074b9';
-  const getProButtons = document.querySelectorAll('.get-pro-btn');
-
-  async function handleGetPro(e) {
-    e.preventDefault();
-    const { data, error } = await supabaseClient.auth.getSession();
-    if (error) { console.error('Auth error:', error); alert('Something went wrong. Please try again.'); return; }
-    const session = data?.session;
-    if (!session?.user) { window.location.href = 'login.html'; return; }
-    const userId = session.user.id;
-    const checkoutUrl = LEMON_CHECKOUT_URL + '?checkout[custom][supabase_user_id]=' + encodeURIComponent(userId);
-    window.open(checkoutUrl, '_blank');
-  }
-
-  getProButtons.forEach(button => button.addEventListener('click', handleGetPro));
-})();
-</script>
 
 <script src="header-menus.js" defer></script>
 </body>

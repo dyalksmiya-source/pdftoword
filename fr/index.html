@@ -35,7 +35,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="dns-prefetch" href="https://pdftoword-production-94af.up.railway.app">
-<link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="../style.css">
@@ -174,6 +173,7 @@
         <div class="profile-menu" id="profileMenu" hidden>
           <p class="profile-menu-email" id="profileMenuEmail"></p>
           <p class="account-plan"><span>Formule</span> <span class="plan-badge" data-plan-badge hidden></span></p>
+          <a href="../account.html" class="account-menu-link">Paramètres du compte</a>
           <button type="button" id="logoutBtn">Déconnexion</button>
         </div>
       </div>
@@ -428,23 +428,25 @@
       <div class="pricing-grid">
         <div class="price-card">
           <h3>Gratuit</h3>
-          <p class="price-amount">0 €</p>
+          <p class="price-amount">0 $</p>
           <ul class="price-features">
-            <li>Conversion PDF vers Word</li>
-            <li>Conversions quotidiennes limitées</li>
-            <li>Limite de 25 Mo par fichier</li>
+            <li>1 conversion toutes les 24 heures</li>
+            <li>Jusqu'à 20 pages par fichier</li>
+            <li>25 Mo par fichier</li>
+            <li>OCR pour les PDF scannés</li>
           </ul>
           <a href="#converter" class="btn btn-secondary btn-full">Commencer à convertir</a>
         </div>
         <div class="price-card price-card-featured">
-          <p class="price-badge">Le plus populaire</p>
           <h3>Pro</h3>
-          <p class="price-amount">$2.99<span>/mois</span></p>
+          <p class="price-amount"><span data-config="pro-price">$2.99</span><span>/ mois</span></p>
           <ul class="price-features">
             <li>Conversions illimitées</li>
             <li>Jusqu'à 200 pages par fichier</li>
+            <li>25 Mo par fichier</li>
             <li>OCR pour les PDF scannés (arabe, français, anglais)</li>
           </ul>
+          <p class="price-note">Renouvellement mensuel automatique, résiliable à tout moment.</p>
           <span class="btn btn-secondary btn-full is-disabled" aria-disabled="true">Pro arrive bientôt</span>
         </div>
       </div>
@@ -587,6 +589,7 @@
     </div>
   </div>
   <div class="footer-bottom">
+    <nav class="footer-legal" aria-label="Liens légaux"><a href="#pricing">Tarifs</a><a href="../terms.html">Conditions d'utilisation</a><a href="../refund-policy.html">Politique de remboursement</a><a href="../privacy.html">Confidentialité</a><a href="../contact.html">Contact</a></nav>
     <p>&copy; <span id="year"></span> PDF2Wordly. Tous droits réservés.</p>
   </div>
 </footer>
@@ -700,49 +703,6 @@
   
 </script>
 
-  <script>
-(function () {
-  'use strict';
-
-  const LEMON_CHECKOUT_URL =
-    'https://pdf2wordly.lemonsqueezy.com/checkout/buy/539e71b2-9f13-4f62-89c3-053c690074b9';
-
-  const getProButtons = document.querySelectorAll('.get-pro-btn');
-
-  async function handleGetPro(e) {
-    e.preventDefault();
-
-    const { data, error } = await supabaseClient.auth.getSession();
-
-    if (error) {
-      console.error('Auth error:', error);
-      alert('Une erreur est survenue. Veuillez réessayer.');
-      return;
-    }
-
-    const session = data?.session;
-
-    if (!session?.user) {
-      window.location.href = '../login.html';
-      return;
-    }
-
-    const userId = session.user.id;
-
-    const checkoutUrl =
-      LEMON_CHECKOUT_URL +
-      '?checkout[custom][supabase_user_id]=' +
-      encodeURIComponent(userId);
-
-    window.open(checkoutUrl, '_blank');
-  }
-
-  getProButtons.forEach(button => {
-    button.addEventListener('click', handleGetPro);
-  });
-
-})();
-</script>
 <script src="../header-menus.js" defer></script>
 </body>
 </html>

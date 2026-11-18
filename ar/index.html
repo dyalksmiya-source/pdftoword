@@ -35,7 +35,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link rel="dns-prefetch" href="https://pdftoword-production-94af.up.railway.app">
-<link rel="dns-prefetch" href="https://app.lemonsqueezy.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="../style.css">
@@ -174,6 +173,7 @@
         <div class="profile-menu" id="profileMenu" hidden>
           <p class="profile-menu-email" id="profileMenuEmail"></p>
           <p class="account-plan"><span>الخطة</span> <span class="plan-badge" data-plan-badge hidden></span></p>
+          <a href="../account.html" class="account-menu-link">إعدادات الحساب</a>
           <button type="button" id="logoutBtn">تسجيل الخروج</button>
         </div>
       </div>
@@ -430,21 +430,23 @@
           <h3>مجاني</h3>
           <p class="price-amount">0$</p>
           <ul class="price-features">
-            <li>تحويل PDF إلى Word</li>
-            <li>عدد محدود من التحويلات يوميًا</li>
-            <li>حد أقصى 25 ميغابايت للملف</li>
+            <li>تحويل واحد كل 24 ساعة</li>
+            <li>حتى 20 صفحة لكل ملف</li>
+            <li>25 ميغابايت لكل ملف</li>
+            <li>التعرف الضوئي (OCR) على ملفات PDF الممسوحة</li>
           </ul>
           <a href="#converter" class="btn btn-secondary btn-full">ابدأ التحويل</a>
         </div>
         <div class="price-card price-card-featured">
-          <p class="price-badge">الأكثر طلبًا</p>
           <h3>Pro</h3>
-          <p class="price-amount">$2.99<span>/الشهر</span></p>
+          <p class="price-amount"><span data-config="pro-price">$2.99</span><span>/ شهريًا</span></p>
           <ul class="price-features">
             <li>تحويلات غير محدودة</li>
             <li>حتى 200 صفحة لكل ملف</li>
+            <li>25 ميغابايت لكل ملف</li>
             <li>التعرف الضوئي على النصوص (OCR) في ملفات PDF الممسوحة (العربية، الفرنسية، الإنجليزية)</li>
           </ul>
+          <p class="price-note">يتجدد تلقائيًا كل شهر، ويمكن الإلغاء في أي وقت.</p>
           <span class="btn btn-secondary btn-full is-disabled" aria-disabled="true">Pro قريبًا</span>
         </div>
       </div>
@@ -587,6 +589,7 @@
     </div>
   </div>
   <div class="footer-bottom">
+    <nav class="footer-legal" aria-label="روابط قانونية"><a href="#pricing">الأسعار</a><a href="../terms.html">شروط الاستخدام</a><a href="../refund-policy.html">سياسة الاسترداد</a><a href="../privacy.html">الخصوصية</a><a href="../contact.html">اتصل بنا</a></nav>
     <p>&copy; <span id="year"></span> PDF2Wordly. جميع الحقوق محفوظة.</p>
   </div>
 </footer>
@@ -700,49 +703,6 @@
   
 </script>
 
-  <script>
-(function () {
-  'use strict';
-
-  const LEMON_CHECKOUT_URL =
-    'https://pdf2wordly.lemonsqueezy.com/checkout/buy/539e71b2-9f13-4f62-89c3-053c690074b9';
-
-  const getProButtons = document.querySelectorAll('.get-pro-btn');
-
-  async function handleGetPro(e) {
-    e.preventDefault();
-
-    const { data, error } = await supabaseClient.auth.getSession();
-
-    if (error) {
-      console.error('Auth error:', error);
-      alert('وقع مشكل. يرجى المحاولة مرة أخرى.');
-      return;
-    }
-
-    const session = data?.session;
-
-    if (!session?.user) {
-      window.location.href = '../login.html';
-      return;
-    }
-
-    const userId = session.user.id;
-
-    const checkoutUrl =
-      LEMON_CHECKOUT_URL +
-      '?checkout[custom][supabase_user_id]=' +
-      encodeURIComponent(userId);
-
-    window.open(checkoutUrl, '_blank');
-  }
-
-  getProButtons.forEach(button => {
-    button.addEventListener('click', handleGetPro);
-  });
-
-})();
-</script>
 <script src="../header-menus.js" defer></script>
 </body>
 </html>
