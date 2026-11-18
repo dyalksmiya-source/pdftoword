@@ -73,36 +73,6 @@
 }
 </script>
 
-<style>
-  .profile-chip{
-    display:none; align-items:center; gap:8px; padding:4px 10px 4px 4px;
-    border-radius:999px; border:1px solid var(--border); background:var(--surface);
-    cursor:pointer; position:relative; font-family:var(--font-body, Inter, sans-serif);
-  }
-  .profile-chip[data-active="true"]{ display:inline-flex; }
-  .profile-avatar{
-    width:26px;height:26px;border-radius:50%; background:var(--primary); color:#fff;
-    font-size:12px;font-weight:600; display:flex;align-items:center;justify-content:center;
-    text-transform:uppercase;
-  }
-  .profile-email{ font-size:13px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .profile-menu{
-    position:absolute; top:calc(100% + 8px); right:0; min-width:210px; background:var(--surface);
-    border:1px solid var(--border); border-radius:var(--radius-md, 10px);
-    box-shadow:var(--shadow-lg, 0 8px 24px rgba(0,0,0,.12)); padding:8px; display:none; z-index:50;
-  }
-  .profile-menu[data-open="true"]{ display:block; }
-  .profile-menu-email{
-    font-size:12px; color:var(--text-muted); padding:6px 8px 8px;
-    border-bottom:1px solid var(--border); margin-bottom:6px; word-break:break-all;
-  }
-  .profile-menu button{
-    width:100%; text-align:left; padding:8px; border:none; background:none;
-    border-radius:6px; font-size:13px; cursor:pointer; color:var(--text);
-  }
-  .profile-menu button:hover{ background:var(--surface-sunken, #f3f3f3); }
-  @media (max-width: 860px) { .header-actions .profile-chip { display: none !important; } }
-</style>
 </head>
 <body>
 
@@ -144,13 +114,14 @@
       </button>
 
       <a href="login.html" class="btn btn-ghost" id="loginLink">Log in</a>
-      <a href="index.html#pricing" class="btn btn-primary btn-small">Get Pro</a>
+      <a href="index.html#pricing" class="btn btn-primary header-get-pro btn-small">Get Pro</a>
 
-      <div class="profile-chip" id="profileChip" data-active="false">
-        <span class="profile-avatar" id="profileAvatar">U</span>
-        <span class="profile-email" id="profileEmailLabel"></span>
-        <div class="profile-menu" id="profileMenu" data-open="false">
+      <div class="profile-chip account-menu" id="profileChip" data-active="false">
+        <button type="button" class="account-btn" aria-expanded="false" aria-controls="profileMenu" aria-label="Account menu"><span class="profile-avatar" id="profileAvatar" aria-hidden="true">U</span></button>
+        <span id="profileEmailLabel" hidden></span>
+        <div class="profile-menu" id="profileMenu" hidden>
           <p class="profile-menu-email" id="profileMenuEmail"></p>
+          <p class="account-plan"><span>Plan</span> <span class="plan-badge" data-plan-badge hidden></span></p>
           <button type="button" id="logoutBtn">Log out</button>
         </div>
       </div>
@@ -402,6 +373,6 @@
 })();
 </script>
 
-<script src="lang-switch.js" defer></script>
+<script src="header-menus.js" defer></script>
 </body>
 </html>
