@@ -67,6 +67,7 @@ const user = { id: '3f1c2a7e-6b1d-4c55-9a8e-2d3b4c5d6e7f', email: 'eve@example.c
 const client = s => ({ auth: { getSession: async () => ({ data: { session: s } }) } });
 const signedIn = client({ user, access_token: 'tok' });
 const signedOut = client(null);
+const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; return { ok: true, json: async () => body }; };
 
 (async () => {
   // ---- config in one place
@@ -95,7 +96,7 @@ const signedOut = client(null);
     const p = paddleMock();
     doc = homePage(lang);
     w = windowMock({ path: lang === 'en' ? '/' : `/${lang}/`, search: '?paddle=sandbox', paddle: p });
-    ok(await B.init(doc, w, signedIn, async () => ({})) === 'ready', `${lang}: ready`);
+    ok(await B.init(doc, w, signedIn, meFetch({ plan: 'free' })) === 'ready', `${lang}: ready`);
     const btn = doc.getElementById('proCta');
     ok(btn.tagName === 'BUTTON' && btn.textContent === label, `${lang}: label "${label}"`);
     ok(p.env === 'sandbox' && p.init.token === B.PADDLE.clientToken && typeof p.init.eventCallback === 'function', `${lang}: Paddle sandbox + token`);
@@ -103,6 +104,53 @@ const signedOut = client(null);
     ok(p.opened && p.opened.items.length === 1 && p.opened.items[0].priceId === B.PADDLE.priceId && p.opened.items[0].quantity === 1, `${lang}: checkout items`);
     ok(p.opened.customer.email === user.email && p.opened.customData.supabase_user_id === user.id, `${lang}: email + supabase_user_id`);
     ok(p.opened.settings.displayMode === 'overlay' && p.opened.settings.locale === lang, `${lang}: overlay, locale ${lang}`);
+  }
+
+  // ---- guard: never open the checkout for a Pro user
+  {
+    const p = paddleMock(); doc = homePage();
+    w = windowMock({ search: '?paddle=sandbox', paddle: p });
+    w.pwPlan = { state: 'pro', update() {} };
+    meFetch.calls = 0;
+    await B.init(doc, w, signedIn, meFetch({ plan: 'free' }));
+    const [res] = await doc.getElementById('proCta').click();
+    ok(res === 'already-pro' && !p.opened && meFetch.calls === 0, 'guard: page already shows Pro -> no checkout');
+    ok(doc.card.children[1].textContent === 'You already have Pro. Manage it from your account settings.', 'guard: "You already have Pro" shown');
+  }
+  {
+    const p = paddleMock(); doc = homePage('fr');
+    w = windowMock({ path: '/fr/', search: '?paddle=sandbox', paddle: p });
+    let updated = null;
+    w.pwPlan = { state: 'free', update(me, uid) { updated = { me, uid }; this.state = 'pro'; } };
+    await B.init(doc, w, signedIn, meFetch({ plan: 'pro', subscription_status: 'active' }));
+    const [res] = await doc.getElementById('proCta').click();
+    ok(res === 'already-pro' && !p.opened, 'guard: fresh /api/me says Pro -> no checkout');
+    ok(updated && updated.uid === user.id && updated.me.plan === 'pro', 'guard: page plan updated from the fresh /api/me');
+    ok(doc.card.children[1].textContent === 'Vous avez déjà Pro. Gérez-le depuis les paramètres du compte.', 'guard: message in French');
+  }
+  {
+    const p = paddleMock(); doc = homePage('ar');
+    w = windowMock({ path: '/ar/', search: '?paddle=sandbox', paddle: p });
+    await B.init(doc, w, signedIn, async () => ({ ok: false, status: 503 }));
+    const [res] = await doc.getElementById('proCta').click();
+    ok(res === 'check-failed' && !p.opened, 'guard: /api/me fails -> no checkout');
+    ok(doc.card.children[1].textContent === 'تعذّر التحقق من خطتك. يُرجى المحاولة مرة أخرى.', 'guard: message in Arabic');
+    await B.init(doc = homePage(), w = windowMock({ search: '?paddle=sandbox', paddle: p }), signedIn, async () => { throw new Error('net'); });
+    ok((await doc.getElementById('proCta').click())[0] === 'check-failed' && !p.opened, 'guard: network error -> no checkout');
+  }
+  {
+    // double click: only one check / one checkout at a time
+    const p = paddleMock(); doc = homePage();
+    w = windowMock({ search: '?paddle=sandbox', paddle: p });
+    let release; let n = 0;
+    const slow = async () => { n++; await new Promise(r => { release = r; }); return { ok: true, json: async () => ({ plan: 'free' }) }; };
+    await B.init(doc, w, signedIn, slow);
+    const btn = doc.getElementById('proCta');
+    const first = btn.click();
+    await new Promise(r => setTimeout(r, 0));
+    const [second] = await btn.click();
+    release(); await first;
+    ok(second === 'busy' && n === 1, 'guard: a second click while checking is ignored');
   }
 
   // ---- Paddle.js loaded from the CDN when not present
@@ -170,6 +218,18 @@ const signedOut = client(null);
   ok(status.textContent === 'Pro is active. Thank you!', 'completed: confirmation shown');
   await p2.init.eventCallback({ name: 'checkout.loaded' });
   ok(status.textContent === 'Pro is active. Thank you!', 'other Paddle events ignored');
+
+  // ---- checkout.completed with plan-ui.js: header/menu/pricing updated via pwPlan.refresh
+  {
+    const p3 = paddleMock(); doc = homePage();
+    w = windowMock({ search: '?paddle=sandbox', paddle: p3 });
+    let refreshed = 0;
+    w.pwPlan = { state: 'free', refresh: async () => { refreshed++; w.pwPlan.state = 'pro'; return { plan: 'pro' }; }, update() {} };
+    await B.init(doc, w, signedIn, meFetch({ plan: 'pro' }));
+    await p3.init.eventCallback({ name: 'checkout.completed' });
+    ok(refreshed === 1 && w.pwPlan.state === 'pro', 'completed: pwPlan.refresh() called once, no reload');
+    ok(doc.badge.hidden, 'completed: plan-ui owns the badge when present');
+  }
 
   // ---- account.js
   const d = A.describe;

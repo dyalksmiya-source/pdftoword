@@ -7,7 +7,11 @@
  * is not loaded and the Pro button keeps saying "Pro is coming soon".
  *
  * The server decides Free / Pro: after checkout.completed this page only
- * polls GET /api/me until the Paddle webhook has activated Pro.
+ * polls GET /api/me until the Paddle webhook has activated Pro, then asks
+ * plan-ui.js (window.pwPlan) to update the header, menu and pricing card.
+ *
+ * Guard: the checkout never opens for a Pro user. The plan shown on the page
+ * is checked first, then GET /api/me is asked again right before opening.
  */
 (function () {
   'use strict';
@@ -37,6 +41,8 @@
       active: 'Pro is active. Thank you!',
       slow: 'Payment received. Pro will be active in a few minutes: refresh the page.',
       failed: 'The checkout could not open. Please try again later.',
+      alreadyPro: 'You already have Pro. Manage it from your account settings.',
+      checkFailed: 'We couldn’t check your plan. Please try again.',
     },
     fr: {
       subscribe: 'S’abonner – {price}/mois',
@@ -44,6 +50,8 @@
       active: 'Pro est activé. Merci !',
       slow: 'Paiement reçu. Pro sera activé dans quelques minutes : actualisez la page.',
       failed: 'Le paiement n’a pas pu s’ouvrir. Veuillez réessayer plus tard.',
+      alreadyPro: 'Vous avez déjà Pro. Gérez-le depuis les paramètres du compte.',
+      checkFailed: 'Impossible de vérifier votre formule. Veuillez réessayer.',
     },
     ar: {
       subscribe: 'اشترك – {price} شهريًا',
@@ -51,6 +59,8 @@
       active: 'تم تفعيل Pro. شكرًا لك!',
       slow: 'تم استلام الدفع. سيتم تفعيل Pro خلال بضع دقائق: حدّث الصفحة.',
       failed: 'تعذّر فتح صفحة الدفع. يُرجى المحاولة لاحقًا.',
+      alreadyPro: 'لديك Pro بالفعل. يمكنك إدارته من إعدادات الحساب.',
+      checkFailed: 'تعذّر التحقق من خطتك. يُرجى المحاولة مرة أخرى.',
     },
   };
 
@@ -159,6 +169,18 @@
     }
   }
 
+  /** One fresh GET /api/me. Resolves the body, or null if it failed. */
+  async function fetchMe(fetchImpl, url, token) {
+    try {
+      var r = await fetchImpl(url, { method: 'GET', headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) return null;
+      var me = await r.json();
+      return me && typeof me === 'object' ? me : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /** Poll /api/me until plan = pro. Resolves 'pro' or 'timeout'. */
   async function pollPro(fetchImpl, url, getToken, opts) {
     opts = opts || {};
@@ -243,7 +265,8 @@
         return s && s.access_token;
       });
       if (result === 'pro') {
-        showBadgePro(doc);
+        if (win.pwPlan) await win.pwPlan.refresh(); // header, menu, pricing: no reload
+        else showBadgePro(doc);
         say(t.active);
         button.disabled = true;
       } else {
@@ -267,22 +290,47 @@
     placeholder.parentNode.replaceChild(button, placeholder);
     button.parentNode.insertBefore(status, button.nextSibling);
 
+    var busy = false;
     button.addEventListener('click', async function () {
-      var s = await getSession(client);
-      if (!s || !s.user) {
-        rememberReturn(win, Date.now());
-        win.location.href = loginUrl(win);
-        return;
-      }
+      if (busy) return 'busy';
+      busy = true;
       try {
-        paddle.Checkout.open({
-          items: [{ priceId: PADDLE.priceId, quantity: 1 }],
-          customer: { email: s.user.email },
-          customData: { supabase_user_id: s.user.id },
-          settings: { displayMode: 'overlay', locale: lang(doc), allowLogout: false },
-        });
-      } catch (e) {
-        say(t.failed);
+        var s = await getSession(client);
+        if (!s || !s.user) {
+          rememberReturn(win, Date.now());
+          win.location.href = loginUrl(win);
+          return 'login';
+        }
+        // Guard 1: the plan already shown on the page.
+        if (win.pwPlan && win.pwPlan.state === 'pro') {
+          say(t.alreadyPro);
+          return 'already-pro';
+        }
+        // Guard 2: ask the server again right before opening.
+        var me = await fetchMe(fetchImpl, api + '/api/me', s.access_token);
+        if (!me) {
+          say(t.checkFailed);
+          return 'check-failed';
+        }
+        if (me.plan === 'pro') {
+          if (win.pwPlan) win.pwPlan.update(me, s.user.id);
+          say(t.alreadyPro);
+          return 'already-pro';
+        }
+        try {
+          paddle.Checkout.open({
+            items: [{ priceId: PADDLE.priceId, quantity: 1 }],
+            customer: { email: s.user.email },
+            customData: { supabase_user_id: s.user.id },
+            settings: { displayMode: 'overlay', locale: lang(doc), allowLogout: false },
+          });
+          return 'opened';
+        } catch (e) {
+          say(t.failed);
+          return 'failed';
+        }
+      } finally {
+        busy = false;
       }
     });
     return 'ready';
@@ -290,7 +338,7 @@
 
   var api = {
     PADDLE: PADDLE, TEXT: TEXT, init: init, flagEnabled: flagEnabled, safeReturn: safeReturn,
-    takeReturn: takeReturn, pollPro: pollPro, lang: lang, loginUrl: loginUrl, pricingPath: pricingPath,
+    takeReturn: takeReturn, pollPro: pollPro, fetchMe: fetchMe, lang: lang, loginUrl: loginUrl, pricingPath: pricingPath,
   };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api; // local tests only

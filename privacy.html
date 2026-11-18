@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#FAFAF9">
 <script>try{var t=localStorage.getItem('pdftoword-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
+<script>try{var u=(JSON.parse(localStorage.getItem('sb-yjxfxdbrjsiuevnkiiak-auth-token')||'null')||{}).user,s='signed-out';if(u&&u.id){var c=null;try{c=JSON.parse(sessionStorage.getItem('pw-plan')||'null')}catch(e){}s=c&&c.u===u.id&&(c.p==='pro'||c.p==='free')?c.p:'loading'}document.documentElement.setAttribute('data-plan-state',s)}catch(e){document.documentElement.setAttribute('data-plan-state','loading')}</script>
 <title>Privacy Policy – PDF2Wordly</title>
 <meta name="description" content="Read how PDF2Wordly collects, uses, and protects your data when you convert PDF files to Word documents.">
 <meta property="og:site_name" content="PDF2Wordly">
@@ -60,6 +61,7 @@
       </button>
       <a href="login.html" class="btn btn-ghost" id="loginLink">Log in</a>
       <a href="index.html#pricing" class="btn btn-primary header-get-pro btn-small">Get Pro</a>
+          <a href="account.html" class="btn btn-secondary header-pro-badge btn-small" data-pro-badge aria-label="Pro plan – account settings" title="Pro plan – account settings"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 18h18M4 7l4.5 4.5L12 5l3.5 6.5L20 7l-1.8 9H5.8z"/></svg><span>Pro</span></a>
 
       <!-- Logged-in state (hidden until a real Supabase session is found) -->
       <div class="profile-chip account-menu" id="profileChip" data-active="false">
@@ -294,6 +296,7 @@
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
 </script>
+<script src="plan-ui.js" defer></script>
 <script src="script.js" defer></script>
 
 <!-- Supabase client library -->

@@ -87,7 +87,11 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
 - Pro = `plan='pro'` **and** status `active` / `trialing` / `past_due`, or
   `canceled` before `current_period_end` (`billing.is_pro`; the same rule is in
   `claim_free_conversion`). Evaluated only from the database.
-- Tests: `python -m unittest discover -s _tests` and `node _tests/billing_js_test.js`.
+- Tests: `python -m unittest discover -s _tests`, `node _tests/billing_js_test.js`
+  and `node _tests/plan_ui_test.js`.
+- Plan display: `plan-ui.js` is the only browser code that asks `/api/me`; it sets
+  `<html data-plan-state>` (loading / signed-out / free / pro) and `style.css` shows
+  "Get Pro" or the "Pro" badge. Pro users never see a purchase button.
 - Converted files and uploads are temporary — deleted right after each
   response is sent (and on every failure path).
 - `pdf2docx` handles standard text-based PDFs well. Complex layouts,

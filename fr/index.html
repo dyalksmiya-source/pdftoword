@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#FAFAF9">
 <script>try{var t=localStorage.getItem('pdftoword-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}</script>
+<script>try{var u=(JSON.parse(localStorage.getItem('sb-yjxfxdbrjsiuevnkiiak-auth-token')||'null')||{}).user,s='signed-out';if(u&&u.id){var c=null;try{c=JSON.parse(sessionStorage.getItem('pw-plan')||'null')}catch(e){}s=c&&c.u===u.id&&(c.p==='pro'||c.p==='free')?c.p:'loading'}document.documentElement.setAttribute('data-plan-state',s)}catch(e){document.documentElement.setAttribute('data-plan-state','loading')}</script>
 <title>Convertisseur PDF en Word gratuit en ligne | PDF2Wordly</title>
 <meta name="description" content="Convertissez un PDF en Word en ligne gratuitement avec PDF2Wordly. Importez votre PDF et obtenez un document Word modifiable rapidement et en toute sécurité.">
 <meta property="og:site_name" content="PDF2Wordly">
@@ -166,6 +167,7 @@
       <!-- Logged-out state -->
       <a href="../login.html" class="btn btn-ghost" id="loginLink">Connexion</a>
    <a href="#pricing" class="btn btn-primary header-get-pro btn-full">Passer à Pro</a>
+          <a href="../account.html" class="btn btn-secondary header-pro-badge btn-full" data-pro-badge aria-label="Formule Pro – paramètres du compte" title="Formule Pro – paramètres du compte"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 18h18M4 7l4.5 4.5L12 5l3.5 6.5L20 7l-1.8 9H5.8z"/></svg><span>Pro</span></a>
       <!-- Logged-in state (hidden until a real Supabase session is found) -->
       <div class="profile-chip account-menu" id="profileChip" data-active="false">
         <button type="button" class="account-btn" aria-expanded="false" aria-controls="profileMenu" aria-label="Menu du compte"><span class="profile-avatar" id="profileAvatar" aria-hidden="true">U</span></button>
@@ -195,6 +197,7 @@
     <div class="mobile-menu-actions">
       <a href="../login.html" class="btn btn-ghost" id="loginLinkMobile">Connexion</a>
       <a href="#pricing" class="btn btn-primary" id="getProBtnMobile">Passer à Pro</a>
+      <a href="../account.html" class="btn btn-secondary header-pro-badge" data-pro-badge aria-label="Formule Pro – paramètres du compte"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 18h18M4 7l4.5 4.5L12 5l3.5 6.5L20 7l-1.8 9H5.8z"/></svg><span>Pro</span></a>
       <div class="profile-chip" id="profileChipMobile" data-active="false" style="margin-top:8px;">
         <span class="profile-avatar" id="profileAvatarMobile">U</span>
         <span class="profile-email" id="profileEmailLabelMobile"></span>
@@ -448,6 +451,10 @@
           </ul>
           <p class="price-note">Renouvellement mensuel automatique, résiliable à tout moment.</p>
           <span class="btn btn-secondary btn-full is-disabled" aria-disabled="true" id="proCta">Pro arrive bientôt</span>
+          <div class="pro-current" data-pro-current>
+            <span class="btn btn-secondary btn-full is-disabled" aria-disabled="true">Votre formule actuelle</span>
+            <a href="../account.html" class="pro-manage-link">Gérer l’abonnement</a>
+          </div>
         </div>
       </div>
     </div>
@@ -586,6 +593,7 @@
   </div>
 </footer>
 
+<script src="../plan-ui.js" defer></script>
 <script src="../script.js" defer></script>
 
 <!-- Supabase client library -->
