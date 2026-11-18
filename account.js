@@ -6,7 +6,9 @@
  *   GET /api/me (the server decides Free / Pro; this page only displays it).
  * - Pro users with a Paddle subscription get "Manage subscription" and
  *   "Cancel subscription": both ask POST /api/billing/portal for a Paddle
- *   customer portal link and open it.
+ *   customer portal link and open it. When a cancellation is already
+ *   scheduled, only "Manage subscription" stays (Paddle's portal lets the
+ *   user resume) and a short note says the subscription will not renew.
  * - "Delete account" stays disabled until the server endpoint exists.
  */
 (function () {
@@ -14,6 +16,12 @@
 
   var ERROR_TEXT = "We couldn't load your plan. Please try again later.";
   var PORTAL_ERROR_TEXT = "We couldn't open the subscription page. Please try again later.";
+  var WILL_NOT_RENEW_TEXT = 'Your subscription will not renew. You can resume it from Manage subscription.';
+
+  /** Site i18n (pwT from script.js); English when it is not there. */
+  function tr(win, text) {
+    return win && typeof win.pwT === 'function' ? win.pwT(text) : text;
+  }
 
   /** Same backend resolution as script.js. */
   function backendUrl(doc, win) {
@@ -77,6 +85,14 @@
       return false;
     }
     box.hidden = false;
+    var scheduled = !!me.cancel_scheduled;
+    var cancelButton = doc.getElementById('cancelSubscription');
+    if (cancelButton) cancelButton.hidden = scheduled;
+    var note = doc.getElementById('billingNote');
+    if (note) {
+      note.textContent = scheduled ? tr(win, WILL_NOT_RENEW_TEXT) : '';
+      note.hidden = !scheduled;
+    }
     var err = doc.getElementById('billingError');
     async function open(which, button) {
       button.disabled = true;

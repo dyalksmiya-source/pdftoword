@@ -240,8 +240,8 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
 
   function accountDoc() {
     const ids = {};
-    ['billingActions', 'billingError', 'manageSubscription', 'cancelSubscription'].forEach(id => { ids[id] = el('div', { id }); });
-    ids.billingActions.hidden = true; ids.billingError.hidden = true;
+    ['billingActions', 'billingError', 'manageSubscription', 'cancelSubscription', 'billingNote'].forEach(id => { ids[id] = el('div', { id }); });
+    ids.billingActions.hidden = true; ids.billingError.hidden = true; ids.billingNote.hidden = true;
     return { ids, getElementById: id => ids[id] || null };
   }
   let ad = accountDoc(); let aw = { location: { href: null } };
@@ -263,6 +263,36 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle' }, 'https://api', 'tok', async () => ({ ok: true, json: async () => ({ overview_url: 'javascript:alert(1)' }) }));
   await ad.ids.manageSubscription.click();
   ok(aw.location.href === null, 'account: non-https portal link refused');
+
+  // ---- cancellation scheduled: only "Manage subscription" + the note (en, fr, ar via pwT)
+  {
+    const fs = require('fs');
+    const src = fs.readFileSync(path.join(__dirname, '..', 'script.js'), 'utf8');
+    const start = src.indexOf('{', src.indexOf('const pwI18n='));
+    let depth = 0, end = start, inStr = false, esc = false;
+    for (let i = start; i < src.length; i++) { const ch = src[i];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true; else if (ch === '{') depth++; else if (ch === '}' && --depth === 0) { end = i; break; } }
+    const DICT = JSON.parse(src.slice(start, end + 1));
+    const NOTE = 'Your subscription will not renew. You can resume it from Manage subscription.';
+    for (const [lang, text] of [['en', NOTE], ['fr', 'Votre abonnement ne sera pas renouvelé. Vous pouvez le réactiver depuis Gérer l’abonnement.'], ['ar', 'لن يتجدد اشتراكك. يمكنك استئنافه من إدارة الاشتراك.']]) {
+      ad = accountDoc(); aw = { location: { href: null }, pwT: k => (DICT[lang] && DICT[lang][k]) || k };
+      A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle', cancel_scheduled: true, ends_at: '2026-12-18T00:00:00Z' }, 'https://api', 'tok', portalFetch);
+      ok(!ad.ids.billingActions.hidden && !ad.ids.manageSubscription.hidden && ad.ids.cancelSubscription.hidden, `scheduled (${lang}): Cancel hidden, Manage kept`);
+      ok(!ad.ids.billingNote.hidden && ad.ids.billingNote.textContent === text, `scheduled (${lang}): note "${text.slice(0, 40)}…"`);
+    }
+    ad = accountDoc(); aw = { location: { href: null } };
+    A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle', cancel_scheduled: false }, 'https://api', 'tok', portalFetch);
+    ok(!ad.ids.cancelSubscription.hidden && ad.ids.billingNote.hidden && ad.ids.billingNote.textContent === '', 'not scheduled: Cancel shown, no note');
+    ad = accountDoc(); aw = { location: { href: null } };
+    A.setupBilling(ad, aw, { plan: 'free', cancel_scheduled: true }, 'https://api', 'tok', portalFetch);
+    ok(ad.ids.billingActions.hidden && ad.ids.billingNote.hidden, 'free: no buttons, no note');
+    const page = fs.readFileSync(path.join(__dirname, '..', 'account.html'), 'utf8');
+    ok(page.includes('<p>You can cancel at any time:</p>') && !/not available yet/i.test(page), 'account.html: "You can cancel at any time:", no "not available yet"');
+    ok(/<\/dl>\s*<p class="account-note" id="billingNote" hidden><\/p>/.test(page), 'account.html: note line right under the status');
+    const css = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
+    ok(css.includes('.account-actions>[hidden]{display:none}'), 'css: hidden button really hidden (beats .btn display)');
+  }
 
   console.log(`\n${passed} passed`);
 })().catch(e => { console.error(e.message); process.exit(1); });
