@@ -12,7 +12,8 @@ Security model (server-enforced, never trust the frontend):
   3. Free vs Pro is read from public.profiles in Supabase (service-role).
      Free = one successful conversion per rolling 24h, enforced with an
      atomic claim/release RPC so simultaneous requests cannot double-spend.
-     Pro (active subscription) = unlimited.
+     Pro = unlimited. Paddle subscriptions update the profile through the
+     signed webhook in billing.py, which also holds the Pro rule.
   4. The Free timestamp is only consumed when conversion SUCCEEDS. On
      failure the claim is released (previous timestamp restored).
 
@@ -20,6 +21,7 @@ Endpoints:
   GET  /api/health   -> health check (public)
   GET  /api/me       -> { plan, subscription_status, ... } for the caller (auth)
   POST /api/convert  -> multipart/form-data, field "file" (auth + limit)
+  POST /api/paddle/webhook, POST /api/billing/portal -> see billing.py
 
 Run:
   python3 server.py
@@ -42,6 +44,8 @@ import pytesseract
 from PIL import Image
 from docx import Document
 from supabase import create_client
+
+import billing
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pdf2wordly")
@@ -82,10 +86,6 @@ PRO_MAX_PAGES = 200
 # Temp files older than this are purged (startup + before each conversion).
 TEMP_DIR = Path(tempfile.gettempdir()) / "pdf2wordly"
 TEMP_MAX_AGE_SECONDS = 30 * 60
-
-# Plans / statuses treated as Pro. Centralized here — the single definition.
-PRO_PLANS = {"pro"}
-PRO_STATUSES = {"active", "trialing"}
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
@@ -147,24 +147,24 @@ def get_authenticated_user_id():
 def is_user_pro(profile):
     """Centralized Pro check. `profile` is the public.profiles row (dict).
 
-    Active Pro requires BOTH plan='pro' AND an active subscription status,
-    so a stale plan value alone can never grant unlimited conversions.
+    The rule (plan, status and the paid-period end date) lives in
+    billing.is_pro, so a stale plan value alone never grants Pro.
     """
-    if not profile:
-        return False
-    plan = str(profile.get("plan") or "free").lower()
-    status = str(profile.get("subscription_status") or "").lower()
-    if plan not in PRO_PLANS:
-        return False
-    return status in PRO_STATUSES
+    return billing.is_pro(profile)
 
 
 def get_profile(admin, user_id):
     """Load the caller's profile with the service-role client (bypasses RLS)."""
-    resp = admin.table("profiles").select(
-        "id, plan, subscription_status, subscription_id, "
-        "current_period_end, last_free_conversion_at"
-    ).eq("id", user_id).limit(1).execute()
+    try:
+        resp = admin.table("profiles").select(billing.PROFILE_COLUMNS) \
+            .eq("id", user_id).limit(1).execute()
+    except Exception:
+        # Migration 002 not run yet: fall back to the columns of migration 001.
+        logger.warning("profiles billing columns missing; run migration 002")
+        resp = admin.table("profiles").select(
+            "id, plan, subscription_status, subscription_id, "
+            "current_period_end, last_free_conversion_at"
+        ).eq("id", user_id).limit(1).execute()
     rows = getattr(resp, "data", None) or []
     return rows[0] if rows else None
 
@@ -302,6 +302,7 @@ def me():
         "plan": "pro" if pro else "free",
         "subscription_status": profile.get("subscription_status"),
         "current_period_end": profile.get("current_period_end"),
+        **billing.billing_summary(profile),
     })
 
 
@@ -476,6 +477,12 @@ def _release_claim(admin, user_id, previous):
                   {"p_user_id": user_id, "p_previous": previous}).execute()
     except Exception:
         logger.exception("Failed to release free-conversion claim")
+
+
+app.register_blueprint(billing.create_blueprint(
+    get_store=lambda: billing.SupabaseStore(_supabase_admin()),
+    get_user_id=get_authenticated_user_id,
+))
 
 
 # Runs once per gunicorn worker at import time.

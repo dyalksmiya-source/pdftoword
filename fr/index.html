@@ -447,7 +447,7 @@
             <li>OCR pour les PDF scannés (arabe, français, anglais)</li>
           </ul>
           <p class="price-note">Renouvellement mensuel automatique, résiliable à tout moment.</p>
-          <span class="btn btn-secondary btn-full is-disabled" aria-disabled="true">Pro arrive bientôt</span>
+          <span class="btn btn-secondary btn-full is-disabled" aria-disabled="true" id="proCta">Pro arrive bientôt</span>
         </div>
       </div>
     </div>
@@ -600,6 +600,9 @@
 
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+  // Shared with billing.js (Pro checkout).
+  window.__supabaseClient = supabaseClient;
+
   // Desktop elements
   const loginLink = document.getElementById("loginLink");
   const profileChip = document.getElementById("profileChip");
@@ -695,6 +698,7 @@
   
 </script>
 
+<script src="../billing.js" defer></script>
 <script src="../header-menus.js" defer></script>
 </body>
 </html>

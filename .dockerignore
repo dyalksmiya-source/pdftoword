@@ -1,4 +1,4 @@
-# Only server.py and requirements.txt are needed in the image.
+# Only server.py, billing.py and requirements.txt are needed in the image.
 .git
 .gitignore
 .venv
@@ -27,3 +27,5 @@ fr/
 CNAME
 Dockerfile
 .dockerignore
+_tests/
+_tools/
