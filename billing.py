@@ -22,6 +22,21 @@ Pro rule (is_pro): plan 'pro' AND
   anything else                              -> Free
 The same rule is in public.claim_free_conversion (docs/sql/002_paddle_billing.sql).
 
+Lifecycle (tests: _tests/test_billing.py, LifecycleTests):
+  renewal          subscription.updated / transaction.completed move
+                   current_period_end forward
+  payment failure  past_due stays Pro while Paddle retries; Paddle's later
+                   subscription.canceled ends it
+  scheduled cancel status stays active, cancel_at = effective date; a
+                   resume (scheduled_change null) clears cancel_at
+  canceled         the cancellation has TAKEN EFFECT: access ends at
+                   canceled_at (or the event time), never later, even if the
+                   payload still carries a future billing period. Used for
+                   immediate cancels and refunds (manual: refund in Paddle,
+                   then cancel immediately; adjustment.* is not handled).
+  paused / resumed paused = Free; resumed sets the new period
+  late transaction never moves the date of a canceled or paused subscription
+
 Logging: only event_id, event_type, whether a user was found, and the result.
 Never the signature, a key or secret, the body, or personal data.
 """
@@ -329,13 +344,29 @@ def _is_conflict(profile, subscription_id, now):
                 and is_pro(profile, now))
 
 
+def _cancel_end(data, occurred_at):
+    """When access ends for a canceled subscription.
+
+    Paddle sends status 'canceled' when the cancellation TAKES EFFECT: at the
+    end of the paid period for a scheduled cancel, or right away for an
+    immediate cancel (dashboard, refund). So access ends at canceled_at
+    (fallback: the event time), and never later than the billing period in
+    the payload, even if the payload still carries a future period.
+    """
+    candidates = [parse_ts(data.get("canceled_at")) or parse_ts(occurred_at)]
+    candidates.append(parse_ts((data.get("current_billing_period") or {}).get("ends_at")))
+    candidates = [c for c in candidates if c]
+    if not candidates:
+        return occurred_at
+    end = min(candidates)
+    return end.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
 def _subscription_fields(data, occurred_at, now):
     status = str(data.get("status") or "").lower()
     period_end = (data.get("current_billing_period") or {}).get("ends_at")
-    if status in CANCELED_STATUSES and not period_end:
-        # Paddle sends subscription.canceled when the cancellation takes
-        # effect (end of the paid period, or now for an immediate cancel).
-        period_end = data.get("canceled_at") or occurred_at
+    if status in CANCELED_STATUSES:
+        period_end = _cancel_end(data, occurred_at)
     scheduled = data.get("scheduled_change") or {}
     cancel_at = scheduled.get("effective_at") if scheduled.get("action") == "cancel" else None
     pro = is_pro({"plan": "pro", "subscription_status": status,
@@ -409,11 +440,16 @@ def process_event(store, event, now=None):
         else:
             # transaction.completed: link the IDs and extend the paid period.
             # The plan itself only changes with subscription events.
+            # A late transaction must never reopen access: when this same
+            # subscription is already canceled or paused, the date stays.
             fields = {"billing_source": "paddle"}
             period_end = (data.get("billing_period") or {}).get("ends_at")
             old_end = parse_ts(profile.get("current_period_end"))
             new_end = parse_ts(period_end)
-            if new_end and (not old_end or new_end > old_end):
+            stopped = (str(profile.get("subscription_status") or "").lower()
+                       in CANCELED_STATUSES | {"paused"}
+                       and profile.get("paddle_subscription_id") == subscription_id)
+            if new_end and not stopped and (not old_end or new_end > old_end):
                 fields["current_period_end"] = period_end
 
         if customer_id:

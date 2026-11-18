@@ -255,13 +255,15 @@ class EventTests(WebhookTestCase):
         self.assertEqual(p["subscription_status"], "canceled")
         self.assertFalse(billing.is_pro(p, now=NOW + timedelta(seconds=1)))
 
-    def test_canceled_with_paid_period_left_is_pro_until_end(self):
+    def test_canceled_payload_with_future_period_ends_access_now(self):
+        # status 'canceled' means the cancellation has taken effect; a future
+        # billing period left in the payload must not keep Pro.
         end = iso(NOW + timedelta(days=10))
         self.post(subscription_event("subscription.canceled", status="canceled", period_end=end))
         p = self.profile()
-        self.assertEqual(p["plan"], "pro")
-        self.assertTrue(billing.is_pro(p, now=NOW))
-        self.assertFalse(billing.is_pro(p, now=NOW + timedelta(days=11)))
+        self.assertEqual(p["plan"], "free")
+        self.assertEqual(p["current_period_end"], iso(NOW))
+        self.assertFalse(billing.is_pro(p, now=NOW + timedelta(seconds=1)))
 
     def test_past_due_is_pro(self):
         self.post(subscription_event("subscription.past_due", status="past_due",
@@ -352,6 +354,163 @@ class EventTests(WebhookTestCase):
         raw = b"not json"
         r = self.post(None, raw=raw, header=sign(raw))
         self.assertEqual(r.status_code, 400)
+
+
+# ---------------------------------------------------------------------------
+# 2b. Subscription lifecycle (renewal, payment failure, resume, immediate
+#     cancel, pause). Events carry increasing occurred_at, like Paddle's.
+# ---------------------------------------------------------------------------
+class LifecycleTests(WebhookTestCase):
+    SUB, CTM = "sub_01m7rdz63mw1d94dhaf7xhbj95", "ctm_live_test"
+
+    def setUp(self):
+        super().setUp()
+        self.n = 0
+        self.period1 = NOW + timedelta(days=30)
+        self.send("subscription.created", "active", period_end=self.period1, at=NOW - timedelta(days=1))
+        self.send("subscription.activated", "active", period_end=self.period1, at=NOW - timedelta(days=1))
+
+    def send(self, event_type, status, period_end=None, at=None, scheduled=None, canceled_at=None, custom=False):
+        self.n += 1
+        ev = subscription_event(event_type, status=status, event_id=f"evt_{self.n:03d}", sub=self.SUB,
+                                customer=self.CTM, period_end=iso(period_end) if period_end else None,
+                                occurred=iso(at or NOW + timedelta(minutes=self.n)), scheduled=scheduled,
+                                canceled_at=iso(canceled_at) if canceled_at else None, custom=custom or self.n <= 2)
+        r = self.post(ev)
+        self.assertEqual(r.status_code, 200, r.get_json())
+        return r.get_json()["result"]
+
+    def transaction(self, period_end, at=None):
+        self.n += 1
+        ev = transaction_event(event_id=f"evt_{self.n:03d}", sub=self.SUB, customer=self.CTM,
+                               period_end=iso(period_end), custom=False)
+        ev["occurred_at"] = iso(at or NOW + timedelta(minutes=self.n))
+        return self.post(ev).get_json()["result"]
+
+    def p(self):
+        return self.store.profiles[USER]
+
+    def me(self, now):
+        return {"pro": billing.is_pro(self.p(), now), **billing.billing_summary(self.p(), now)}
+
+    # 1. Renewal --------------------------------------------------------------
+    def test_renewal_moves_period_forward_and_stays_pro(self):
+        period2 = self.period1 + timedelta(days=30)
+        at = self.period1 + timedelta(minutes=1)
+        self.assertEqual(self.send("subscription.updated", "active", period_end=period2, at=at), "processed")
+        self.assertEqual(self.transaction(period2, at=at + timedelta(seconds=5)), "processed")
+        self.assertEqual(self.p()["current_period_end"], iso(period2))
+        self.assertTrue(billing.is_pro(self.p(), now=self.period1 + timedelta(days=1)))
+        self.assertEqual(self.me(self.period1 + timedelta(days=1))["renews_at"], iso(period2))
+
+    def test_renewal_transaction_first_then_subscription_updated(self):
+        period2 = self.period1 + timedelta(days=30)
+        at = self.period1 + timedelta(minutes=1)
+        self.transaction(period2, at=at)
+        self.send("subscription.updated", "active", period_end=period2, at=at - timedelta(seconds=2))
+        self.assertEqual(self.p()["current_period_end"], iso(period2))
+        self.assertTrue(billing.is_pro(self.p(), now=self.period1 + timedelta(days=1)))
+
+    # 2. Payment failure ------------------------------------------------------
+    def test_past_due_stays_pro_then_paddle_cancel_ends_it(self):
+        period2 = self.period1 + timedelta(days=30)
+        t = self.period1 + timedelta(minutes=1)
+        self.send("subscription.past_due", "past_due", period_end=period2, at=t)
+        self.assertTrue(billing.is_pro(self.p(), now=t + timedelta(days=3)), "past_due keeps Pro while Paddle retries")
+        cancel_time = t + timedelta(days=14)
+        self.send("subscription.canceled", "canceled", canceled_at=cancel_time, at=cancel_time)
+        self.assertEqual(self.p()["subscription_status"], "canceled")
+        self.assertFalse(billing.is_pro(self.p(), now=cancel_time + timedelta(seconds=1)))
+
+    def test_past_due_then_payment_recovered(self):
+        period2 = self.period1 + timedelta(days=30)
+        t = self.period1 + timedelta(minutes=1)
+        self.send("subscription.past_due", "past_due", period_end=period2, at=t)
+        self.send("subscription.updated", "active", period_end=period2, at=t + timedelta(days=2))
+        self.assertEqual(self.p()["subscription_status"], "active")
+        self.assertTrue(billing.is_pro(self.p(), now=t + timedelta(days=3)))
+
+    # 3. Scheduled cancellation, then resume --------------------------------
+    def test_scheduled_cancel_then_resume_clears_cancel_at(self):
+        sched = {"action": "cancel", "effective_at": iso(self.period1), "resume_at": None}
+        self.send("subscription.updated", "active", period_end=self.period1, scheduled=sched)
+        self.assertTrue(self.me(NOW)["cancel_scheduled"])
+        self.assertEqual(self.p()["cancel_at"], iso(self.period1))
+        self.send("subscription.updated", "active", period_end=self.period1, scheduled=None)
+        self.assertIsNone(self.p()["cancel_at"])
+        m = self.me(NOW)
+        self.assertFalse(m["cancel_scheduled"])
+        self.assertEqual(m["renews_at"], iso(self.period1))
+        self.assertTrue(m["pro"])
+
+    def test_scheduled_cancel_takes_effect_at_period_end(self):
+        sched = {"action": "cancel", "effective_at": iso(self.period1), "resume_at": None}
+        self.send("subscription.updated", "active", period_end=self.period1, scheduled=sched)
+        self.assertTrue(billing.is_pro(self.p(), now=self.period1 - timedelta(minutes=1)))
+        self.send("subscription.canceled", "canceled", canceled_at=self.period1, at=self.period1)
+        self.assertFalse(billing.is_pro(self.p(), now=self.period1 + timedelta(seconds=1)))
+        self.assertIsNone(self.p()["cancel_at"])
+
+    # 4. Immediate cancellation -----------------------------------------------
+    def test_immediate_cancel_ends_pro_now_even_with_future_period(self):
+        t = NOW + timedelta(days=5)
+        # payload still carrying the (future) billing period
+        self.send("subscription.canceled", "canceled", period_end=self.period1, canceled_at=t, at=t)
+        self.assertEqual(self.p()["current_period_end"], iso(t))
+        self.assertFalse(billing.is_pro(self.p(), now=t + timedelta(seconds=1)))
+        m = self.me(t + timedelta(seconds=1))
+        self.assertFalse(m["pro"])
+        self.assertIsNone(m["renews_at"])
+
+    def test_immediate_cancel_without_canceled_at_uses_event_time(self):
+        t = NOW + timedelta(days=5)
+        self.send("subscription.canceled", "canceled", period_end=self.period1, at=t)
+        self.assertEqual(self.p()["current_period_end"], iso(t))
+        self.assertFalse(billing.is_pro(self.p(), now=t + timedelta(seconds=1)))
+
+    def test_late_transaction_after_cancel_does_not_reopen_access(self):
+        t = NOW + timedelta(days=5)
+        self.send("subscription.canceled", "canceled", canceled_at=t, at=t)
+        self.assertEqual(self.transaction(self.period1 + timedelta(days=30), at=t + timedelta(minutes=1)), "processed")
+        self.assertEqual(self.p()["current_period_end"], iso(t))
+        self.assertFalse(billing.is_pro(self.p(), now=t + timedelta(minutes=2)))
+
+    def test_old_updated_after_immediate_cancel_is_stale(self):
+        t = NOW + timedelta(days=5)
+        self.send("subscription.canceled", "canceled", canceled_at=t, at=t)
+        self.assertEqual(self.send("subscription.updated", "active", period_end=self.period1,
+                                   at=t - timedelta(minutes=1)), "stale")
+        self.assertFalse(billing.is_pro(self.p(), now=t + timedelta(seconds=1)))
+
+    # 5. Pause / resume --------------------------------------------------------
+    def test_pause_then_resume(self):
+        t = NOW + timedelta(days=2)
+        self.send("subscription.paused", "paused", at=t)
+        self.assertFalse(billing.is_pro(self.p(), now=t + timedelta(seconds=1)))
+        self.assertEqual(self.p()["plan"], "free")
+        self.transaction(self.period1 + timedelta(days=30), at=t + timedelta(minutes=1))
+        self.assertFalse(billing.is_pro(self.p(), now=t + timedelta(minutes=2)), "late transaction does not unpause")
+        period2 = t + timedelta(days=40)
+        self.send("subscription.resumed", "active", period_end=period2, at=t + timedelta(days=10))
+        self.assertTrue(billing.is_pro(self.p(), now=t + timedelta(days=11)))
+        self.assertEqual(self.p()["current_period_end"], iso(period2))
+
+    def test_scheduled_pause_keeps_pro_until_it_happens(self):
+        sched = {"action": "pause", "effective_at": iso(self.period1), "resume_at": None}
+        self.send("subscription.updated", "active", period_end=self.period1, scheduled=sched)
+        self.assertTrue(billing.is_pro(self.p(), now=NOW + timedelta(days=1)))
+        self.assertIsNone(self.p()["cancel_at"], "a scheduled pause is not a scheduled cancellation")
+
+    # 6. Refund (manual): refund in Paddle, then cancel immediately -> case 4
+    def test_refund_flow_ends_access_with_the_immediate_cancel(self):
+        t = NOW + timedelta(days=3)
+        self.assertEqual(self.send("subscription.canceled", "canceled", period_end=self.period1,
+                                   canceled_at=t, at=t), "processed")
+        self.assertFalse(billing.is_pro(self.p(), now=t + timedelta(seconds=1)))
+        # adjustment.* events are not subscribed; if one arrives it is ignored
+        ev = {"event_id": "evt_adj", "event_type": "adjustment.created", "occurred_at": iso(t),
+              "data": {"id": "adj_01", "subscription_id": self.SUB, "customer_id": self.CTM}}
+        self.assertEqual(self.post(ev).get_json()["result"], "ignored")
 
 
 # ---------------------------------------------------------------------------
