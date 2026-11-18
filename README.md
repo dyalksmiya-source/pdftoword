@@ -53,8 +53,8 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
    `OCR_LANGUAGES`). No code change needed besides the frontend backend URL.
 4. **Payments** — Paddle (Merchant of Record) is being set up; checkout and the
    subscription webhook will be added once Paddle approves the domain.
-5. **Site values** — legal name, support email, price, refund days and reply
-   time live in `_tools/site-config.json`; run `python _tools/apply_site_config.py`
+5. **Site values** — legal name and legal form, support email, price, refund
+   days and reply time live in `_tools/site-config.json`; run `python _tools/apply_site_config.py`
    after changing them.
 
 ## API
