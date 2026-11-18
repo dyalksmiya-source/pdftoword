@@ -609,7 +609,126 @@ class ServerTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# 9. Docker image contents (.dockerignore)
+# 9. /api/convert with the claim_free_conversion results of migration 002
+#    (RETURNS jsonb {allowed, reason, previous}; supabase-py gives a dict).
+#    ClaimCompat is a mixin so the same cases can run against another copy of
+#    server.py (e.g. the version live on Railway) via `self.server`.
+# ---------------------------------------------------------------------------
+def tiny_pdf():
+    import fitz
+    doc = fitz.open()
+    doc.new_page().insert_text((72, 72), "Hello")
+    return doc.tobytes()
+
+
+class ClaimCompat:
+    server = None  # set by subclasses
+
+    def run_convert(self, profile, rpc_result=None, rpc_error=None, fail_conversion=False):
+        srv = self.server
+        admin = mock.Mock()
+        chain = mock.Mock()
+        chain.select.return_value = chain
+        chain.eq.return_value = chain
+        chain.limit.return_value = chain
+        chain.execute.return_value = mock.Mock(data=[profile])
+        admin.table.return_value = chain
+        calls = []
+
+        def rpc(name, params):
+            calls.append((name, params))
+            call = mock.Mock()
+            if name == "claim_free_conversion" and rpc_error:
+                call.execute.side_effect = rpc_error
+            else:
+                call.execute.return_value = mock.Mock(data=rpc_result if name == "claim_free_conversion" else None)
+            return call
+
+        admin.rpc.side_effect = rpc
+
+        def convert(_inp, out):
+            if fail_conversion:
+                raise RuntimeError("conversion failed")
+            Path(out).write_bytes(b"PK fake docx")
+
+        with mock.patch.object(srv, "get_authenticated_user_id", return_value=(USER, None)), \
+                mock.patch.object(srv, "_supabase_admin", return_value=admin), \
+                mock.patch.object(srv, "run_conversion", side_effect=convert):
+            from io import BytesIO
+            r = srv.app.test_client().post(
+                "/api/convert", content_type="multipart/form-data",
+                data={"file": (BytesIO(tiny_pdf()), "doc.pdf")})
+            body = r.get_data()
+            r.close()
+        return r.status_code, body, calls
+
+    def free(self, **extra):
+        p = {"id": USER, "plan": "free", "subscription_status": None,
+             "current_period_end": None, "last_free_conversion_at": None}
+        p.update(extra)
+        return p
+
+    def test_first_conversion(self):
+        code, _, calls = self.run_convert(self.free(), {"allowed": True, "reason": "first_conversion", "previous": None})
+        self.assertEqual(code, 200)
+        self.assertEqual([c[0] for c in calls], ["claim_free_conversion"])
+
+    def test_24_hours_passed(self):
+        prev = iso(NOW - timedelta(days=2))
+        code, _, _ = self.run_convert(self.free(last_free_conversion_at=prev),
+                                      {"allowed": True, "reason": "24_hours_passed", "previous": prev})
+        self.assertEqual(code, 200)
+
+    def test_within_24_hours_is_429(self):
+        last = iso(datetime.now(timezone.utc) - timedelta(hours=1))
+        code, body, _ = self.run_convert(self.free(last_free_conversion_at=last),
+                                         {"allowed": False, "reason": "within_24_hours", "previous": last})
+        self.assertEqual(code, 429)
+        data = json.loads(body)
+        self.assertEqual(data["code"], "FREE_LIMIT_REACHED")
+        self.assertTrue(0 < data["retry_after_seconds"] <= 86400)
+
+    def test_pro_reason_from_database_is_accepted(self):
+        # Profile the server itself may not see as Pro (e.g. the live server's
+        # older rule): the database answers reason 'pro', the file converts.
+        code, _, calls = self.run_convert(
+            self.free(plan="pro", subscription_status="past_due"),
+            {"allowed": True, "reason": "pro", "previous": None})
+        self.assertEqual(code, 200)
+
+    def test_failed_conversion_releases_with_previous(self):
+        prev = iso(NOW - timedelta(days=2))
+        code, _, calls = self.run_convert(self.free(last_free_conversion_at=prev),
+                                          {"allowed": True, "reason": "24_hours_passed", "previous": prev},
+                                          fail_conversion=True)
+        self.assertEqual(code, 500)
+        self.assertEqual(calls[-1], ("release_free_conversion", {"p_user_id": USER, "p_previous": prev}))
+
+    def test_profile_not_found_exception_is_500(self):
+        code, _, _ = self.run_convert(self.free(), rpc_error=Exception("P0001: Profile not found"))
+        self.assertEqual(code, 500)
+
+    def test_list_shape_still_accepted(self):
+        code, _, _ = self.run_convert(self.free(), [{"allowed": True, "reason": "claimed", "previous": None}])
+        self.assertEqual(code, 200)
+
+
+class ClaimCompatNewServerTests(ClaimCompat, unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import server  # noqa: F401
+        cls.server = sys.modules["server"]
+
+    def test_pro_user_skips_claim(self):
+        code, _, calls = self.run_convert(
+            self.free(plan="pro", subscription_status="canceled",
+                      current_period_end=iso(datetime.now(timezone.utc) + timedelta(days=3))))
+        self.assertEqual(code, 200)
+        self.assertEqual(calls, [])
+
+
+# ---------------------------------------------------------------------------
+# 10. Docker image contents (.dockerignore)
 # ---------------------------------------------------------------------------
 def docker_ignored(rel, patterns):
     """Docker's rule: the last matching pattern wins; a path is also excluded
