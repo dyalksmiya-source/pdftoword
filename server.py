@@ -55,6 +55,12 @@ import billing
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pdf2wordly")
+# supabase-py talks to Supabase through httpx, which logs every request URL
+# at INFO, user ids in query strings included (profiles?...&id=eq.<uuid>).
+# Keep those libraries at WARNING so request URLs are never logged.
+QUIET_LOGGERS = ("httpx", "httpcore")
+for _name in QUIET_LOGGERS:
+    logging.getLogger(_name).setLevel(logging.WARNING)
 
 # ---------------------------------------------------------------------------
 # Configuration (all secrets come from environment — never from frontend code)
@@ -590,7 +596,7 @@ def convert():
             size = os.path.getsize(input_path)
         except OSError:
             size = -1
-        logger.info("Converting upload for user %s (%d bytes)", user_id, size)
+        logger.info("Converting upload (%d bytes)", size)
 
         run_conversion(input_path, output_path)
 
