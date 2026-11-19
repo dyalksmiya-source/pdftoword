@@ -26,9 +26,10 @@
   'use strict';
 
   // ---- Configuration -----------------------------------------------------------
-  // Cloudflare Turnstile site key (public). '' = OFF. When set, the secret key
-  // goes in Supabase -> Authentication -> Attack Protection (never here).
-  var TURNSTILE_SITE_KEY = '';
+  // Cloudflare Turnstile site key (public; hostnames pdf2wordly.com and
+  // www.pdf2wordly.com, mode Managed). '' = OFF. The SECRET key goes only in
+  // Supabase -> Authentication -> Attack Protection (never here).
+  var TURNSTILE_SITE_KEY = '0x4AAAAAAGIi-TmOWlcKHDZg';
   var TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
   // All must be in Supabase -> Authentication -> URL Configuration -> Redirect URLs.
   var OAUTH_REDIRECT_URLS = {
@@ -211,35 +212,62 @@
 
   // ---- Cloudflare Turnstile ------------------------------------------------------
   /**
-   * OFF (site key ''): enabled=false, token() -> null, nothing is loaded.
-   * ON: one widget per [data-captcha="name"] container; token(name) gives the
-   * current token, reset(name) after each use (tokens are single-use).
+   * OFF (site key '' or no [data-captcha] slot on the page): enabled=false,
+   * token() -> null, nothing is loaded.
+   * ON: one widget per [data-captcha="name"] slot, drawn when its panel is
+   * shown (ensure(name); never inside a hidden panel), in the site theme
+   * (dark / light), the page language and a width that fits phones. token(name) is
+   * the current token; reset(name) after EVERY call that used it, success or
+   * error (tokens are single-use and expire after 300 s; an expired token is
+   * cleared and Turnstile refreshes it by itself). rerender() redraws the
+   * widgets after a theme change.
    */
   function createCaptcha(doc, win, siteKey) {
     var key = siteKey === undefined ? TURNSTILE_SITE_KEY : siteKey;
-    var off = { enabled: false, token: function () { return null; }, reset: function () {}, options: function () { return undefined; } };
-    if (!key) return off;
+    var off = { enabled: false, token: function () { return null; }, reset: function () {},
+      options: function () { return undefined; }, rerender: function () {}, ensure: function () {} };
+    if (!key || !doc || !doc.querySelectorAll || doc.querySelectorAll('[data-captcha]').length === 0) return off;
     var tokens = {};
     var widgets = {};
-    function renderAll() {
+    var wanted = [];
+    var ready = !!win.turnstile;
+    function theme() {
+      return doc.documentElement && doc.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    }
+    function slot(name) {
       var boxes = doc.querySelectorAll('[data-captcha]');
-      for (var i = 0; i < boxes.length; i++) {
-        (function (box) {
-          var name = box.getAttribute('data-captcha');
+      for (var i = 0; i < boxes.length; i++) if (boxes[i].getAttribute('data-captcha') === name) return boxes[i];
+      return null;
+    }
+    function draw(name) {
+      var box = slot(name);
+      if (!box) return;
+      (function () {
           box.hidden = false;
+          tokens[name] = null;
           widgets[name] = win.turnstile.render(box, {
             sitekey: key,
+            theme: theme(),
             language: lang(doc),
+            size: 'flexible',
+            'refresh-expired': 'auto',
             callback: function (tk) { tokens[name] = tk; },
             'expired-callback': function () { tokens[name] = null; },
+            'timeout-callback': function () { tokens[name] = null; },
             'error-callback': function () { tokens[name] = null; },
           });
-        })(boxes[i]);
-      }
+      })();
     }
-    if (win.turnstile) renderAll();
-    else {
-      win.onPwTurnstileLoad = renderAll;
+    /** Draw the widget of this slot once it is visible (or when the script is ready). */
+    function ensure(name) {
+      if (wanted.indexOf(name) === -1) wanted.push(name);
+      if (ready && widgets[name] === undefined) draw(name);
+    }
+    if (!ready) {
+      win.onPwTurnstileLoad = function () {
+        ready = true;
+        wanted.forEach(function (n) { if (widgets[n] === undefined) draw(n); });
+      };
       var s = doc.createElement('script');
       s.src = TURNSTILE_SRC + '&onload=onPwTurnstileLoad';
       s.async = true;
@@ -248,6 +276,7 @@
     }
     return {
       enabled: true,
+      ensure: ensure,
       token: function (name) { return tokens[name] || null; },
       reset: function (name) {
         tokens[name] = null;
@@ -255,11 +284,20 @@
       },
       /** {captchaToken} for Supabase, or undefined when there is no token. */
       options: function (name) { var tk = tokens[name]; return tk ? { captchaToken: tk } : undefined; },
+      /** Theme changed: draw the widgets again (new tokens follow). */
+      rerender: function () {
+        if (!win.turnstile) return;
+        Object.keys(widgets).forEach(function (name) {
+          try { win.turnstile.remove(widgets[name]); } catch (e) { /* already gone */ }
+        });
+        widgets = {};
+        wanted.forEach(draw);
+      },
     };
   }
 
   // ---- Page chrome: theme, mobile menu, password eye -----------------------------
-  function wireChrome(doc, win, t) {
+  function wireChrome(doc, win, t, onTheme) {
     var root = doc.documentElement;
     var toggle = doc.getElementById('themeToggle');
     function paint() {
@@ -276,6 +314,7 @@
         if (dark) root.removeAttribute('data-theme'); else root.setAttribute('data-theme', 'dark');
         try { win.localStorage.setItem('pdftoword-theme', dark ? 'light' : 'dark'); } catch (e) { /* blocked */ }
         paint();
+        if (onTheme) onTheme(dark ? 'light' : 'dark');
       });
     }
     var menuBtn = doc.getElementById('mobileMenuToggle');
@@ -367,6 +406,7 @@
       if (tabSignup) tabSignup.setAttribute('aria-selected', String(tab === 'signup'));
       renderSwitch(tab);
       if (tab !== 'code') stopCountdown();
+      if (captcha.ensure) captcha.ensure(tab);
     }
 
     function goSignedIn() {
@@ -626,6 +666,7 @@
     var btn = doc.getElementById('submitBtn');
     var banner = doc.getElementById('formBanner');
     if (!form || !input) return null;
+    if (captcha.ensure) captcha.ensure('forgot');
     function showBanner(kind, text) {
       if (!banner) return;
       banner.textContent = text;
@@ -735,9 +776,11 @@
     var start = function () {
       var client = window.__supabaseClient;
       if (!client) return;
-      wireChrome(document, window, translator(document));
-      if (document.getElementById('loginForm')) initLogin(document, window, client);
-      if (document.getElementById('forgotForm')) initForgot(document, window, client);
+      // One Turnstile set per page (log in, sign up, code / forgot password).
+      var captcha = createCaptcha(document, window);
+      wireChrome(document, window, translator(document), function () { captcha.rerender(); });
+      if (document.getElementById('loginForm')) initLogin(document, window, client, { captcha: captcha });
+      if (document.getElementById('forgotForm')) initForgot(document, window, client, { captcha: captcha });
       if (document.getElementById('resetForm')) initReset(document, window, client);
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
