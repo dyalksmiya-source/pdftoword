@@ -115,8 +115,14 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   `canceled` before `current_period_end` (`billing.is_pro`; the same rule is in
   `claim_free_conversion`). Evaluated only from the database.
 - Tests: `python -m unittest discover -s _tests`, `node _tests/billing_js_test.js`
-  `node _tests/plan_ui_test.js`, `node _tests/account_delete_test.js` and
-  `node _tests/auth_test.js`.
+  `node _tests/plan_ui_test.js`, `node _tests/account_delete_test.js`,
+  `node _tests/auth_test.js` and `node _tests/filename_test.js`.
+- File names (`filename.js`, loaded before `script.js` on the converter pages):
+  one line with the ellipsis in the middle (start + end + `.pdf` kept, full name
+  in the tooltip); names with encoded UTF-8 (`%D9%82` or Scribd-style
+  `D9-82-D8-B5`) are shown decoded when valid. The download name follows the
+  same rules as `docx_download_name` in `server.py`: decoded, unsafe characters
+  removed, at most 80 characters, `converted.docx` if nothing is left.
 - Sign-in (`auth.js`, used by `login.html`, `fr/login.html`, `ar/login.html` and
   `forgot-password.html`): Google first (`prompt=select_account`); email sign up
   confirmed with the 6-digit code of the "Confirm signup" email (`verifyOtp`,

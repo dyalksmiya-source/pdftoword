@@ -913,7 +913,7 @@ def tiny_pdf():
 class ClaimCompat:
     server = None  # set by subclasses
 
-    def run_convert(self, profile, rpc_result=None, rpc_error=None, fail_conversion=False):
+    def run_convert(self, profile, rpc_result=None, rpc_error=None, fail_conversion=False, filename="doc.pdf"):
         srv = self.server
         admin = mock.Mock()
         chain = mock.Mock()
@@ -946,8 +946,9 @@ class ClaimCompat:
             from io import BytesIO
             r = srv.app.test_client().post(
                 "/api/convert", content_type="multipart/form-data",
-                data={"file": (BytesIO(tiny_pdf()), "doc.pdf")})
+                data={"file": (BytesIO(tiny_pdf()), filename)})
             body = r.get_data()
+            self.last_headers = dict(r.headers)
             r.close()
         return r.status_code, body, calls
 

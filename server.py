@@ -33,6 +33,7 @@ Run:
 
 import logging
 import os
+import re
 import tempfile
 import threading
 import time
@@ -221,6 +222,61 @@ def purge_old_temp_files(max_age=TEMP_MAX_AGE_SECONDS):
                 entry.unlink()
         except OSError as exc:
             logger.warning("Could not purge temp file %s: %s", entry, exc)
+
+
+# ---------------------------------------------------------------------------
+# Download name (same rules as filename.js on the site)
+# ---------------------------------------------------------------------------
+
+DOWNLOAD_NAME_MAX = 80
+_HEX_RUN = re.compile(r"(^|[^0-9A-Fa-f])((?:[0-9A-Fa-f]{2}-)+[0-9A-Fa-f]{2})(?=$|[^0-9A-Fa-f])")
+_PERCENT_RUN = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _utf8_or_none(data):
+    try:
+        text = bytes(data).decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    return None if _CONTROL.search(text) else text
+
+
+def decode_file_name(name):
+    """Show percent-encoded UTF-8 ("%D9%82") and Scribd-like hex runs
+    ("D9-82-D8-B5") decoded when the bytes are valid UTF-8; else unchanged."""
+    name = str(name or "")
+
+    def percent(m):
+        text = _utf8_or_none(int(h, 16) for h in m.group(0)[1:].split("%"))
+        return m.group(0) if text is None else text
+
+    def hexrun(m):
+        data = [int(h, 16) for h in m.group(2).split("-")]
+        if not any(b >= 0x80 for b in data):
+            return m.group(0)
+        text = _utf8_or_none(data)
+        return m.group(0) if text is None else m.group(1) + text
+
+    return _HEX_RUN.sub(hexrun, _PERCENT_RUN.sub(percent, name))
+
+
+def docx_download_name(original_name):
+    """Same base name, decoded, unsafe characters removed, <= 80 characters
+    before ".docx", never empty. Flask adds filename* (RFC 5987) for non-ASCII."""
+    name = decode_file_name(original_name)
+    name = re.split(r"[\\/]", name)[-1]                  # never a path
+    base = re.sub(r"\.[A-Za-z0-9]{1,5}$", "", name)
+    base = _CONTROL.sub("", base)
+    base = re.sub(r'[\\/:*?"<>|]', "-", base)
+    base = re.sub(r"\s+", " ", base)
+    base = re.sub(r"-{2,}", "-", base)
+    base = base.strip(" .-_")
+    if not any(ch.isalnum() for ch in base):
+        base = ""
+    if len(base) > DOWNLOAD_NAME_MAX:
+        base = base[:DOWNLOAD_NAME_MAX].rstrip(" .-_")
+    return (base or "converted") + ".docx"
 
 
 def check_pdf_limits(pdf_path, max_pages):
@@ -457,8 +513,7 @@ def convert():
     if not original_name.lower().endswith(".pdf"):
         return jsonify({"code": "CONVERSION_FAILED",
                         "error": "Please upload a valid PDF file."}), 400
-    safe_stem = Path(original_name).stem[:80] or "document"
-    output_name = safe_stem + ".docx"
+    output_name = docx_download_name(original_name)
 
     try:
         admin = _supabase_admin()
