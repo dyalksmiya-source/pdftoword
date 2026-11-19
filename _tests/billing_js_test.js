@@ -2,6 +2,7 @@
 // Run from website/:  node _tests/billing_js_test.js
 'use strict';
 const path = require('path');
+const fs = require('fs');
 const B = require(path.join(__dirname, '..', 'billing.js'));
 const A = require(path.join(__dirname, '..', 'account.js'));
 
@@ -28,9 +29,11 @@ function el(tag, attrs = {}) {
 }
 function homePage(lang = 'en') {
   const card = el('div');
-  const label = { en: 'Pro is coming soon', fr: 'Pro arrive bientôt', ar: 'Pro قريبًا' }[lang];
-  const span = el('span', { id: 'proCta', text: label });
-  card.appendChild(span);
+  // the page's own button: disabled until Paddle.js is ready
+  const label = { en: 'Subscribe – $4.99/month', fr: 'S’abonner – $4.99/mois', ar: 'اشترك – $4.99 شهريًا' }[lang];
+  const placeholder = el('button', { id: 'proCta', text: label });
+  placeholder.disabled = true;
+  card.appendChild(placeholder);
   const price = el('span', { text: '$4.99' });
   const badge = el('span', { 'data-plan-badge': '' }); badge.hidden = true;
   const head = el('head');
@@ -48,12 +51,13 @@ function storageMock(init = {}) {
   const m = { ...init };
   return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: k => { delete m[k]; }, m };
 }
+// paddle: a Paddle.js stub by default; false = not loaded yet (CDN tests)
 function windowMock({ path = '/', search = '', hash = '', store = storageMock(), paddle } = {}) {
   const w = {
     location: { pathname: path, search, hash, hostname: 'pdf2wordly.com', href: null, replaced: null, replace(u) { this.replaced = u; } },
     sessionStorage: store,
   };
-  if (paddle) w.Paddle = paddle;
+  if (paddle !== false) w.Paddle = paddle || paddleMock();
   return w;
 }
 function paddleMock() {
@@ -71,37 +75,27 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
 
 (async () => {
   // ---- config in one place
-  ok(B.PADDLE.env === 'sandbox' && B.PADDLE.priceId === 'pri_01m7qw0f7qr17f82dtkdx560wv'
-     && B.PADDLE.clientToken === 'test_7b94c0b97260a1251ddd3166350'
-     && B.PADDLE.scriptUrl === 'https://cdn.paddle.com/paddle/v2/paddle.js', 'config: env, token, price, Paddle.js v2 URL');
+  ok(B.PADDLE.env === 'production' && B.PADDLE.priceId === 'pri_01m7sv3bfjjw2sr5se9mb34p5q'
+     && B.PADDLE.clientToken === 'live_7207935eda621c8816f74b80377'
+     && B.PADDLE.scriptUrl === 'https://cdn.paddle.com/paddle/v2/paddle.js', 'config: LIVE env, live token, live price, Paddle.js v2 URL');
+  ok(!('flagEnabled' in B) && !/paddle=sandbox|pw-paddle/.test(fs.readFileSync(path.join(__dirname, '..', 'billing.js'), 'utf8')), 'no hidden ?paddle=sandbox gate left');
 
-  // ---- hidden without the flag
+  // ---- open to everyone: no URL flag, no stored flag
   let doc = homePage(); let w = windowMock();
-  ok(await B.init(doc, w, signedIn, async () => ({})) === 'hidden', 'no flag: hidden');
-  ok(doc.head.children.length === 0, 'no flag: Paddle.js not loaded');
-  ok(doc.getElementById('proCta').tagName === 'SPAN' && doc.getElementById('proCta').textContent === 'Pro is coming soon', 'no flag: button unchanged');
-  w = windowMock({ search: '?paddle=live' });
-  ok(await B.init(homePage(), w, signedIn, async () => ({})) === 'hidden', 'other flag values: hidden');
+  ok(await B.init(doc, w, signedIn, meFetch({ plan: 'free' })) === 'ready', 'checkout ready for every visitor (no ?paddle=sandbox)');
+  ok(w.Paddle.env === null, 'live: Paddle.Environment.set("sandbox") is not called');
 
-  // ---- flag remembered in sessionStorage, ?paddle=off forgets it
-  const store = storageMock();
-  ok(B.flagEnabled(windowMock({ search: '?paddle=sandbox', store })) && store.m['pw-paddle'] === 'sandbox', 'flag: ?paddle=sandbox stored');
-  ok(B.flagEnabled(windowMock({ store })), 'flag: remembered on the next page');
-  ok(!B.flagEnabled(windowMock({ search: '?paddle=off', store })) && !('pw-paddle' in store.m), 'flag: ?paddle=off forgets it');
-  const throwing = { location: { search: '?paddle=sandbox' }, get sessionStorage() { throw new Error('blocked'); } };
-  ok(B.flagEnabled(throwing) === false, 'flag: blocked storage -> hidden, no crash');
-
-  // ---- with the flag: label in en, fr, ar; Paddle initialised
+  // ---- label in en, fr, ar; Paddle initialised
   for (const [lang, label] of [['en', 'Subscribe – $4.99/month'], ['fr', 'S’abonner – $4.99/mois'], ['ar', 'اشترك – $4.99 شهريًا']]) {
     const p = paddleMock();
     doc = homePage(lang);
-    w = windowMock({ path: lang === 'en' ? '/' : `/${lang}/`, search: '?paddle=sandbox', paddle: p });
+    w = windowMock({ path: lang === 'en' ? '/' : `/${lang}/`, paddle: p });
     ok(await B.init(doc, w, signedIn, meFetch({ plan: 'free' })) === 'ready', `${lang}: ready`);
     const btn = doc.getElementById('proCta');
     ok(btn.tagName === 'BUTTON' && btn.textContent === label, `${lang}: label "${label}"`);
-    ok(p.env === 'sandbox' && p.init.token === B.PADDLE.clientToken && typeof p.init.eventCallback === 'function', `${lang}: Paddle sandbox + token`);
+    ok(p.env === null && p.init.token === 'live_7207935eda621c8816f74b80377' && typeof p.init.eventCallback === 'function', `${lang}: Paddle live + live token`);
     await btn.click();
-    ok(p.opened && p.opened.items.length === 1 && p.opened.items[0].priceId === B.PADDLE.priceId && p.opened.items[0].quantity === 1, `${lang}: checkout items`);
+    ok(p.opened && p.opened.items.length === 1 && p.opened.items[0].priceId === 'pri_01m7sv3bfjjw2sr5se9mb34p5q' && p.opened.items[0].quantity === 1, `${lang}: checkout with the live price, quantity 1`);
     ok(p.opened.customer.email === user.email && p.opened.customData.supabase_user_id === user.id, `${lang}: email + supabase_user_id`);
     ok(p.opened.settings.displayMode === 'overlay' && p.opened.settings.locale === lang, `${lang}: overlay, locale ${lang}`);
   }
@@ -109,7 +103,7 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   // ---- guard: never open the checkout for a Pro user
   {
     const p = paddleMock(); doc = homePage();
-    w = windowMock({ search: '?paddle=sandbox', paddle: p });
+    w = windowMock({ paddle: p });
     w.pwPlan = { state: 'pro', update() {} };
     meFetch.calls = 0;
     await B.init(doc, w, signedIn, meFetch({ plan: 'free' }));
@@ -119,7 +113,7 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   }
   {
     const p = paddleMock(); doc = homePage('fr');
-    w = windowMock({ path: '/fr/', search: '?paddle=sandbox', paddle: p });
+    w = windowMock({ path: '/fr/', paddle: p });
     let updated = null;
     w.pwPlan = { state: 'free', update(me, uid) { updated = { me, uid }; this.state = 'pro'; } };
     await B.init(doc, w, signedIn, meFetch({ plan: 'pro', subscription_status: 'active' }));
@@ -130,18 +124,18 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   }
   {
     const p = paddleMock(); doc = homePage('ar');
-    w = windowMock({ path: '/ar/', search: '?paddle=sandbox', paddle: p });
+    w = windowMock({ path: '/ar/', paddle: p });
     await B.init(doc, w, signedIn, async () => ({ ok: false, status: 503 }));
     const [res] = await doc.getElementById('proCta').click();
     ok(res === 'check-failed' && !p.opened, 'guard: /api/me fails -> no checkout');
     ok(doc.card.children[1].textContent === 'تعذّر التحقق من خطتك. يُرجى المحاولة مرة أخرى.', 'guard: message in Arabic');
-    await B.init(doc = homePage(), w = windowMock({ search: '?paddle=sandbox', paddle: p }), signedIn, async () => { throw new Error('net'); });
+    await B.init(doc = homePage(), w = windowMock({ paddle: p }), signedIn, async () => { throw new Error('net'); });
     ok((await doc.getElementById('proCta').click())[0] === 'check-failed' && !p.opened, 'guard: network error -> no checkout');
   }
   {
     // double click: only one check / one checkout at a time
     const p = paddleMock(); doc = homePage();
-    w = windowMock({ search: '?paddle=sandbox', paddle: p });
+    w = windowMock({ paddle: p });
     let release; let n = 0;
     const slow = async () => { n++; await new Promise(r => { release = r; }); return { ok: true, json: async () => ({ plan: 'free' }) }; };
     await B.init(doc, w, signedIn, slow);
@@ -154,16 +148,17 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   }
 
   // ---- Paddle.js loaded from the CDN when not present
-  doc = homePage(); w = windowMock({ search: '?paddle=sandbox' });
+  doc = homePage(); w = windowMock({ paddle: false });
   doc.head.onAppend = s => { w.Paddle = paddleMock(); s.onload(); };
   ok(await B.init(doc, w, signedIn, async () => ({})) === 'ready' && doc.head.children[0].src === B.PADDLE.scriptUrl, 'loads Paddle.js v2 from the CDN');
-  doc = homePage(); w = windowMock({ search: '?paddle=sandbox' });
+  doc = homePage(); w = windowMock({ paddle: false });
   doc.head.onAppend = s => s.onerror();
-  ok(await B.init(doc, w, signedIn, async () => ({})) === 'error' && doc.getElementById('proCta').tagName === 'SPAN', 'Paddle.js fails: button stays "coming soon"');
+  ok(await B.init(doc, w, signedIn, async () => ({})) === 'error' && doc.getElementById('proCta').disabled
+     && doc.getElementById('proCta').textContent === 'The checkout could not open. Please try again later.', 'Paddle.js fails: button stays disabled and says why');
 
   // ---- signed out: remember #pricing and go to login
   for (const [p, login, back] of [['/', 'login.html', '/#pricing'], ['/fr/', 'login.html', '/fr/#pricing'], ['/ar/', 'login.html', '/ar/#pricing']]) {
-    const st = storageMock({ 'pw-paddle': 'sandbox' });
+    const st = storageMock();
     const pm = paddleMock();
     doc = homePage(); w = windowMock({ path: p, store: st, paddle: pm });
     await B.init(doc, w, signedOut, async () => ({}));
@@ -192,7 +187,7 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   await B.init(homePage(), w, signedIn, async () => ({}), t0 + 31 * 60_000);
   ok(w.location.replaced === null, 'return target older than 30 min ignored');
   st = storageMock({ 'pw-return': 'not json' }); w = windowMock({ store: st });
-  ok(await B.init(homePage(), w, signedIn, async () => ({}), t0) === 'hidden', 'broken return value ignored');
+  ok(await B.init(homePage(), w, signedIn, async () => ({}), t0) === 'ready', 'broken return value ignored');
 
   // ---- polling /api/me
   let clock = 0; const sleep = async ms => { clock += ms; };
@@ -208,7 +203,7 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
 
   // ---- checkout.completed -> message, then badge Pro
   const p2 = paddleMock(); doc = homePage();
-  w = windowMock({ search: '?paddle=sandbox', paddle: p2 });
+  w = windowMock({ paddle: p2 });
   await B.init(doc, w, signedIn, async () => ({ ok: true, json: async () => ({ plan: 'pro' }) }));
   const status = doc.card.children[1];
   const done = p2.init.eventCallback({ name: 'checkout.completed' });
@@ -222,7 +217,7 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   // ---- checkout.completed with plan-ui.js: header/menu/pricing updated via pwPlan.refresh
   {
     const p3 = paddleMock(); doc = homePage();
-    w = windowMock({ search: '?paddle=sandbox', paddle: p3 });
+    w = windowMock({ paddle: p3 });
     let refreshed = 0;
     w.pwPlan = { state: 'free', refresh: async () => { refreshed++; w.pwPlan.state = 'pro'; return { plan: 'pro' }; }, update() {} };
     await B.init(doc, w, signedIn, meFetch({ plan: 'pro' }));

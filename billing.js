@@ -1,10 +1,9 @@
 /*
  * PDF2Wordly Pro checkout (Paddle Billing, Paddle.js v2).
  *
- * Hidden from normal visitors: the checkout is enabled only after a visit
- * with ?paddle=sandbox (remembered for this tab in sessionStorage;
- * ?paddle=off forgets it). Without the flag this file does nothing: Paddle.js
- * is not loaded and the Pro button keeps saying "Pro is coming soon".
+ * Live for every visitor: on the home pages (en, fr, ar) this file loads
+ * Paddle.js and turns the Pro card button into "Subscribe – $x/month".
+ * Signed-out visitors go to the login page first and come back to #pricing.
  *
  * The server decides Free / Pro: after checkout.completed this page only
  * polls GET /api/me until the Paddle webhook has activated Pro, then asks
@@ -16,18 +15,19 @@
 (function () {
   'use strict';
 
-  // ---- The ONE place to switch from sandbox to live ------------------------
-  // Live: env 'production', the live client-side token (live_...) and the
-  // live price ID. The client-side token is public by design (not a secret).
+  // ---- The ONE place for the Paddle checkout settings ---------------------
+  // LIVE. Product pro_01m7stw60y2bpwmq8j563f70xa, price $4.99/month (tax
+  // included). The client-side token is public by design (not a secret).
+  // Sandbox (tests only): env 'sandbox', token test_7b94c0b97260a1251ddd3166350,
+  // price pri_01m7qw0f7qr17f82dtkdx560wv.
   var PADDLE = {
-    env: 'sandbox',
-    clientToken: 'test_7b94c0b97260a1251ddd3166350',
-    priceId: 'pri_01m7qw0f7qr17f82dtkdx560wv',
+    env: 'production',
+    clientToken: 'live_7207935eda621c8816f74b80377',
+    priceId: 'pri_01m7sv3bfjjw2sr5se9mb34p5q',
     scriptUrl: 'https://cdn.paddle.com/paddle/v2/paddle.js',
   };
   // ---------------------------------------------------------------------------
 
-  var FLAG_KEY = 'pw-paddle';
   var RETURN_KEY = 'pw-return';
   var RETURN_MAX_AGE_MS = 30 * 60 * 1000;
   var ALLOWED_RETURNS = ['/#pricing', '/fr/#pricing', '/ar/#pricing'];
@@ -90,19 +90,6 @@
   function removeItem(win, key) {
     var s = storage(win);
     try { if (s) s.removeItem(key); } catch (e) { /* storage blocked */ }
-  }
-
-  /** True when the hidden checkout flag is on for this tab. */
-  function flagEnabled(win) {
-    var value = null;
-    try {
-      value = new URLSearchParams(win.location.search || '').get('paddle');
-    } catch (e) {
-      value = null;
-    }
-    if (value === 'sandbox') setItem(win, FLAG_KEY, 'sandbox');
-    if (value === 'off') removeItem(win, FLAG_KEY);
-    return getItem(win, FLAG_KEY) === 'sandbox';
   }
 
   /** Only the 3 pricing sections are valid return targets. */
@@ -228,14 +215,13 @@
   }
 
   /**
-   * Returns 'hidden' (no flag), 'redirect' (return after login),
-   * 'no-button', 'error' (Paddle.js failed) or 'ready'.
+   * Returns 'redirect' (return after login), 'no-button' (not a home page),
+   * 'error' (Paddle.js failed) or 'ready'.
    */
   async function init(doc, win, client, fetchImpl, now) {
     now = now || Date.now();
     var session = await getSession(client);
     if (takeReturn(win, !!(session && session.user), now)) return 'redirect';
-    if (!flagEnabled(win)) return 'hidden';
 
     var placeholder = doc.getElementById('proCta');
     if (!placeholder) return 'no-button';
@@ -279,6 +265,9 @@
       if (PADDLE.env === 'sandbox') paddle.Environment.set('sandbox');
       paddle.Initialize({ token: PADDLE.clientToken, eventCallback: onEvent });
     } catch (e) {
+      // Paddle.js blocked or down: the button stays disabled and says so.
+      placeholder.textContent = t.failed;
+      placeholder.disabled = true;
       return 'error';
     }
 
@@ -337,7 +326,7 @@
   }
 
   var api = {
-    PADDLE: PADDLE, TEXT: TEXT, init: init, flagEnabled: flagEnabled, safeReturn: safeReturn,
+    PADDLE: PADDLE, TEXT: TEXT, init: init, safeReturn: safeReturn,
     takeReturn: takeReturn, pollPro: pollPro, fetchMe: fetchMe, lang: lang, loginUrl: loginUrl, pricingPath: pricingPath,
   };
   if (typeof module !== 'undefined' && module.exports) {

@@ -13,7 +13,7 @@ with `pdf2docx` (OCR fallback for scanned PDFs).
 | Frontend | GitHub Pages → `https://pdf2wordly.com` |
 | Backend  | Railway (Flask, `server.py`, `Dockerfile`) |
 | Auth + DB| Supabase (`public.profiles`, RLS, trigger) |
-| Payments | Paddle Billing, Merchant of Record (Pro Monthly $4.99): `billing.js` + `billing.py`, sandbox only for now |
+| Payments | Paddle Billing, Merchant of Record (Pro Monthly $4.99): `billing.js` + `billing.py`, live |
 
 ## Run it locally
 
@@ -54,10 +54,10 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
 4. **Payments (Paddle)** — run `docs/sql/002_paddle_billing.sql` (WORD repo)
    first, then set `PADDLE_ENV`, `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`,
    `PADDLE_PRICE_ID` in Railway (never in files). Webhook destination:
-   `https://api.pdf2wordly.com/api/paddle/webhook`. The checkout is hidden:
-   it appears only after visiting the site with `?paddle=sandbox`
-   (`?paddle=off` hides it again). Client-side token, price ID and
-   environment are at the top of `billing.js` (the one place to switch to live).
+   `https://api.pdf2wordly.com/api/paddle/webhook`. Live: `PADDLE_ENV=production`
+   (the server then calls `https://api.paddle.com`). The checkout is open to
+   everyone; client-side token, price ID and environment are at the top of
+   `billing.js` (the one place to switch between live and sandbox).
 5. **Site values** — legal name and legal form, support email, price, refund
    days and reply time live in `_tools/site-config.json`; run `python _tools/apply_site_config.py`
    after changing them.
