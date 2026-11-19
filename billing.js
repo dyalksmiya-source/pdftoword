@@ -3,6 +3,9 @@
  *
  * Live for every visitor: on the home pages (en, fr, ar) this file loads
  * Paddle.js and turns the Pro card button into "Subscribe – $x/month".
+ * Paddle.js (~17 KB) is loaded only when it is needed: when the pricing
+ * section comes near the screen, when the user points at / touches / tabs
+ * to the Pro button, or when the page opens on #pricing (whenNeeded).
  * Signed-out visitors go to the login page first and come back to #pricing.
  *
  * The server decides Free / Pro: after checkout.completed this page only
@@ -219,10 +222,41 @@
   }
 
   /**
+   * Resolves when Paddle.js is worth loading: the pricing card is within
+   * ~600px of the screen, or the user reaches the Pro button, or the page was
+   * opened on #pricing. Without IntersectionObserver: at once.
+   */
+  function whenNeeded(doc, win, button) {
+    return new Promise(function (resolve) {
+      var done = false;
+      var observer = null;
+      function go() {
+        if (done) return;
+        done = true;
+        if (observer) observer.disconnect();
+        resolve();
+      }
+      if (String(win.location && win.location.hash || '') === '#pricing') return go();
+      ['pointerenter', 'touchstart', 'focus'].forEach(function (ev) {
+        button.addEventListener(ev, go, { once: true, passive: true });
+      });
+      var target = doc.getElementById('pricing') || button;
+      if (typeof win.IntersectionObserver !== 'function') return go();
+      observer = new win.IntersectionObserver(function (entries) {
+        if (entries.some(function (e) { return e.isIntersecting; })) go();
+      }, { rootMargin: '600px 0px' });
+      observer.observe(target);
+    });
+  }
+
+  /**
    * Returns 'redirect' (return after login), 'no-button' (not a home page),
    * 'error' (Paddle.js failed) or 'ready'.
+   * opts.waitUntilNeeded: a function returning a promise; Paddle.js is loaded
+   * after it resolves (the browser start passes whenNeeded).
    */
-  async function init(doc, win, client, fetchImpl, now) {
+  async function init(doc, win, client, fetchImpl, now, opts) {
+    opts = opts || {};
     now = now || Date.now();
     var session = await getSession(client);
     if (takeReturn(win, !!(session && session.user), now)) return 'redirect';
@@ -264,6 +298,7 @@
       }
     }
 
+    if (opts.waitUntilNeeded) await opts.waitUntilNeeded(placeholder);
     try {
       paddle = await loadPaddle(doc, win);
       if (PADDLE.env === 'sandbox') paddle.Environment.set('sandbox');
@@ -338,14 +373,16 @@
   }
 
   var api = {
-    PADDLE: PADDLE, TEXT: TEXT, init: init, safeReturn: safeReturn,
+    PADDLE: PADDLE, TEXT: TEXT, init: init, whenNeeded: whenNeeded, safeReturn: safeReturn,
     takeReturn: takeReturn, pollPro: pollPro, fetchMe: fetchMe, lang: lang, loginUrl: loginUrl, pricingPath: pricingPath,
   };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api; // local tests only
   } else {
     var start = function () {
-      init(document, window, window.__supabaseClient, window.fetch.bind(window));
+      init(document, window, window.__supabaseClient, window.fetch.bind(window), undefined, {
+        waitUntilNeeded: function (button) { return whenNeeded(document, window, button); },
+      });
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
     else start();

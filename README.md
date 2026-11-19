@@ -62,6 +62,23 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
    days and reply time live in `_tools/site-config.json`; run `python _tools/apply_site_config.py`
    after changing them.
 
+## SEO (technical)
+
+- `_tools/seo.json` is the inventory: per page URL, language, translation group,
+  index/noindex, title (<= 60 chars, keyword first, brand last), description
+  (<= 155 chars) and keyword targets.
+- `python _tools/apply_seo.py` writes the `<head>` SEO block (title, description,
+  robots, self-canonical, hreflang en/fr/ar + x-default, Open Graph, Twitter,
+  font preload), Organization/WebSite and WebApplication structured data (Pro
+  price from `site-config.json`), clean internal links (no `index.html`), the
+  standard footer and the "Related guides" / home guides blocks.
+- `python _tools/build_sitemap.py` rebuilds `sitemap.xml` from `seo.json`
+  (indexable pages only, lastmod from git, hreflang alternates).
+- Both have `--check`; `_tests/test_seo.py` fails if a page or the sitemap is stale.
+- `python _tools/seo_report.py ../docs/seo` regenerates the page inventory and
+  keyword map (WORD repo).
+- `404.html` is served by GitHub Pages for missing URLs (noindex, root-relative links).
+
 ## API
 
 - `GET /api/health` — public.

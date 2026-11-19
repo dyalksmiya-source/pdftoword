@@ -1,0 +1,184 @@
+{
+  "_about": "Single source for titles, descriptions, robots, canonicals, hreflang, social tags and keyword targets. Edit here, then run: python _tools/apply_seo.py && python _tools/build_sitemap.py (both have --check). Keep titles <= 60 chars (keyword first, brand last) and descriptions <= 155 chars.",
+  "site": "https://pdf2wordly.com",
+  "brand": " | PDF2Wordly",
+  "image": {
+    "url": "https://pdf2wordly.com/og-image.png",
+    "width": 1200,
+    "height": 630,
+    "alt": {
+      "en": "PDF2Wordly: PDF to Word, editable in seconds",
+      "fr": "PDF2Wordly : PDF en Word modifiable en quelques secondes",
+      "ar": "PDF2Wordly: تحويل PDF إلى Word قابل للتعديل في ثوانٍ"
+    }
+  },
+  "locales": {"en": "en_US", "fr": "fr_FR", "ar": "ar_AR"},
+  "x_default": "en",
+  "pages": {
+    "index.html": {
+      "url": "/", "lang": "en", "group": "home", "index": true, "type": "website",
+      "title": "PDF to Word Converter – Free, Online & Editable | PDF2Wordly",
+      "description": "Convert PDF to Word online with PDF2Wordly: an editable DOCX in seconds, OCR for scanned PDFs in English, French and Arabic, and a free plan.",
+      "primary": "pdf to word converter",
+      "secondary": ["convert pdf to word online free", "pdf2word", "pdf to docx"]
+    },
+    "fr/index.html": {
+      "url": "/fr/", "lang": "fr", "group": "home", "index": true, "type": "website",
+      "title": "Convertir PDF en Word en ligne gratuitement | PDF2Wordly",
+      "description": "Convertissez vos PDF en Word modifiable en ligne : un DOCX en quelques secondes, l’OCR pour les PDF scannés et une formule gratuite, sans logiciel.",
+      "primary": "convertir pdf en word en ligne",
+      "secondary": ["convertir pdf en word gratuit en ligne", "convertisseur pdf word", "pdf en word modifiable"]
+    },
+    "ar/index.html": {
+      "url": "/ar/", "lang": "ar", "group": "home", "index": true, "type": "website",
+      "title": "تحويل PDF إلى Word أونلاين مجانًا | PDF2Wordly",
+      "description": "حوّل ملف PDF إلى Word قابل للتعديل أونلاين في ثوانٍ، مع التعرّف الضوئي على النصوص في الملفات الممسوحة بالعربية والفرنسية والإنجليزية، وخطة مجانية.",
+      "primary": "تحويل pdf الى word",
+      "secondary": ["تحويل من بي دي اف الى وورد", "تحويل ملف pdf الى word", "تحويل pdf الى word مجانا"]
+    },
+    "scanned-pdf-to-word.html": {
+      "url": "/scanned-pdf-to-word.html", "lang": "en", "index": true, "type": "article",
+      "title": "Scanned PDF to Word: Free OCR Converter | PDF2Wordly",
+      "description": "Turn a scanned or image-only PDF into an editable Word document with built-in OCR for English, French and Arabic. Free plan, no software to install.",
+      "primary": "scanned pdf to word",
+      "secondary": ["scan to word", "ocr pdf to word", "convert scanned pdf to editable word", "image pdf to word"]
+    },
+    "how-to-convert-pdf-to-word.html": {
+      "url": "/how-to-convert-pdf-to-word.html", "lang": "en", "index": true, "type": "article",
+      "title": "How to Convert PDF to Word in 3 Steps | PDF2Wordly",
+      "description": "A step-by-step guide to turning any PDF into an editable Word document in your browser: upload, convert, download. Plus tips for scans and locked files.",
+      "primary": "how to convert pdf to word",
+      "secondary": ["how do i convert a pdf to a word document", "convert pdf to word step by step", "turn pdf into word"]
+    },
+    "pdf-to-word-without-losing-formatting.html": {
+      "url": "/pdf-to-word-without-losing-formatting.html", "lang": "en", "index": true, "type": "article",
+      "title": "PDF to Word Without Losing Formatting | PDF2Wordly",
+      "description": "Keep fonts, layout, tables and images when you convert a PDF to Word: what converts cleanly, what may need a touch-up, and how to get the best result.",
+      "primary": "pdf to word without losing formatting",
+      "secondary": ["keep formatting pdf to word", "pdf to word same layout", "accurate pdf to word"]
+    },
+    "pdf-to-word-tables-and-business-documents.html": {
+      "url": "/pdf-to-word-tables-and-business-documents.html", "lang": "en", "index": true, "type": "article",
+      "title": "PDF Tables to Word: Invoices & Reports | PDF2Wordly",
+      "description": "Convert PDF tables, invoices and financial reports to editable Word: what carries over well, what to check after converting, and how to fix it fast.",
+      "primary": "pdf table to word",
+      "secondary": ["convert invoice pdf to word", "pdf report to word", "pdf to word with tables"]
+    },
+    "pdf-to-word-resume.html": {
+      "url": "/pdf-to-word-resume.html", "lang": "en", "index": true, "type": "article",
+      "title": "PDF Resume to Word: Edit Your CV Fast | PDF2Wordly",
+      "description": "Turn a PDF resume or CV into an editable Word document for job applications and ATS forms, keep the layout intact, and update it in minutes.",
+      "primary": "pdf resume to word",
+      "secondary": ["convert cv pdf to word", "resume pdf to docx", "edit pdf resume in word"]
+    },
+    "convert-multiple-pdf-files-to-word.html": {
+      "url": "/convert-multiple-pdf-files-to-word.html", "lang": "en", "index": true, "type": "article",
+      "title": "Convert Multiple PDF Files to Word | PDF2Wordly",
+      "description": "Convert several PDF files to Word one after another, understand the 25 MB file limit, and see how Pro handles up to 100 files per day.",
+      "primary": "convert multiple pdf to word",
+      "secondary": ["several pdf files to word", "batch pdf to word", "many pdfs to word"]
+    },
+    "pdf-to-word-on-mac-and-mobile.html": {
+      "url": "/pdf-to-word-on-mac-and-mobile.html", "lang": "en", "index": true, "type": "article",
+      "title": "PDF to Word on Mac, iPhone & Android | PDF2Wordly",
+      "description": "Convert a PDF to an editable Word document on a Mac, iPhone or Android phone with just a browser. No app to install, step by step for each device.",
+      "primary": "pdf to word on mac",
+      "secondary": ["pdf to word iphone", "pdf to word android", "pdf to word on phone"]
+    },
+    "pdf-to-word-alternative-to-ilovepdf.html": {
+      "url": "/pdf-to-word-alternative-to-ilovepdf.html", "lang": "en", "index": true, "type": "article",
+      "title": "iLovePDF PDF to Word Alternative, Free | PDF2Wordly",
+      "description": "Looking for an iLovePDF alternative for PDF to Word? See how PDF2Wordly compares: OCR for Arabic and French scans, no watermark and a free plan.",
+      "primary": "ilovepdf pdf to word",
+      "secondary": ["ilovepdf alternative", "free alternative to ilovepdf pdf to word"]
+    },
+    "pdf-to-word-vs-smallpdf.html": {
+      "url": "/pdf-to-word-vs-smallpdf.html", "lang": "en", "index": true, "type": "article",
+      "title": "Smallpdf Alternative for PDF to Word | PDF2Wordly",
+      "description": "Smallpdf or PDF2Wordly for PDF to Word? Compare features, OCR for scanned files, account needs and price, so you can pick the right tool for you.",
+      "primary": "smallpdf alternative",
+      "secondary": ["smallpdf pdf to word", "smallpdf vs pdf2wordly"]
+    },
+    "unlock-password-protected-pdf-to-word.html": {
+      "url": "/unlock-password-protected-pdf-to-word.html", "lang": "en", "index": true, "type": "article",
+      "title": "Password-Protected PDF to Word: How-To | PDF2Wordly",
+      "description": "Locked PDFs can't be converted directly. Check whether your file is protected, remove a password you know, then turn it into an editable Word file.",
+      "primary": "password protected pdf to word",
+      "secondary": ["unlock pdf to word", "secured pdf to word", "encrypted pdf to word"]
+    },
+    "pdf-to-word-not-working.html": {
+      "url": "/pdf-to-word-not-working.html", "lang": "en", "index": true, "type": "article",
+      "title": "PDF to Word Not Working? Quick Fixes | PDF2Wordly",
+      "description": "PDF to Word conversion failed? Fix the usual causes fast: files over 25 MB, non-PDF uploads, daily limits, locked PDFs and downloads that won't open.",
+      "primary": "pdf to word not working",
+      "secondary": ["pdf to word conversion failed", "pdf won't convert to word"]
+    },
+    "about.html": {
+      "url": "/about.html", "lang": "en", "index": true, "type": "website",
+      "title": "About Us: A Simple PDF to Word Tool | PDF2Wordly",
+      "description": "Who builds PDF2Wordly, what it does and how it handles your files: an online PDF to Word converter with OCR, a free plan and Pro for regular use.",
+      "primary": "pdf2wordly",
+      "secondary": ["about pdf2wordly"]
+    },
+    "contact.html": {
+      "url": "/contact.html", "lang": "en", "index": true, "type": "website",
+      "title": "Contact & Support | PDF2Wordly",
+      "description": "Get help with PDF2Wordly: conversion problems, your account, billing and refunds, or privacy requests. Email support; we reply within 2 business days.",
+      "primary": "pdf2wordly support",
+      "secondary": ["pdf2wordly contact"]
+    },
+    "privacy.html": {
+      "url": "/privacy.html", "lang": "en", "index": true, "type": "website",
+      "title": "Privacy Policy | PDF2Wordly",
+      "description": "How PDF2Wordly handles your data: files deleted within 30 minutes, the account data we keep, the services we use, and your privacy rights.",
+      "primary": "pdf2wordly privacy policy",
+      "secondary": []
+    },
+    "terms.html": {
+      "url": "/terms.html", "lang": "en", "index": true, "type": "website",
+      "title": "Terms of Service | PDF2Wordly",
+      "description": "The terms for using PDF2Wordly: accounts, the Free plan, the Pro monthly subscription, renewal, cancellation, refunds and payments through Paddle.",
+      "primary": "pdf2wordly terms",
+      "secondary": []
+    },
+    "refund-policy.html": {
+      "url": "/refund-policy.html", "lang": "en", "index": true, "type": "website",
+      "title": "Refund Policy: Full Refund in 14 Days | PDF2Wordly",
+      "description": "A full refund within 14 days of any PDF2Wordly Pro payment, no conditions: how to ask, how Paddle processes it, and what happens after a refund.",
+      "primary": "pdf2wordly refund policy",
+      "secondary": []
+    },
+    "delete-account.html": {
+      "url": "/delete-account.html", "lang": "en", "group": "delete", "index": true, "type": "website",
+      "title": "Delete Your Account | PDF2Wordly",
+      "description": "How to delete your PDF2Wordly account from the website or the app, what data is deleted, what is kept, and how to ask by email.",
+      "primary": "delete pdf2wordly account",
+      "secondary": []
+    },
+    "fr/delete-account.html": {
+      "url": "/fr/delete-account.html", "lang": "fr", "group": "delete", "index": true, "type": "website",
+      "title": "Supprimer votre compte | PDF2Wordly",
+      "description": "Comment supprimer votre compte PDF2Wordly sur le site ou dans l’application, les données supprimées ou conservées, et la demande par e-mail.",
+      "primary": "supprimer compte pdf2wordly",
+      "secondary": []
+    },
+    "ar/delete-account.html": {
+      "url": "/ar/delete-account.html", "lang": "ar", "group": "delete", "index": true, "type": "website",
+      "title": "حذف حسابك | PDF2Wordly",
+      "description": "كيفية حذف حسابك في PDF2Wordly من الموقع أو التطبيق، والبيانات التي تُحذف والتي يُحتفظ بها، وكيفية طلب الحذف بالبريد الإلكتروني.",
+      "primary": "حذف حساب pdf2wordly",
+      "secondary": []
+    },
+    "account.html": {"lang": "en", "index": false, "title": "Account settings – PDF2Wordly", "description": "Your PDF2Wordly account, plan and subscription."},
+    "login.html": {"lang": "en", "index": false, "title": "Log in or Sign up – PDF2Wordly", "description": "Log in or create a free PDF2Wordly account to convert PDF files to Word documents."},
+    "forgot-password.html": {"lang": "en", "index": false, "title": "Forgot Password – PDF2Wordly", "description": "Reset your PDF2Wordly account password."},
+    "reset-password.html": {"lang": "en", "index": false, "title": "Reset Password – PDF2Wordly", "description": "Set a new password for your PDF2Wordly account."},
+    "fr/login.html": {"lang": "fr", "index": false, "title": "Connexion ou inscription – PDF2Wordly", "description": "Connectez-vous ou créez un compte PDF2Wordly gratuit pour convertir vos fichiers PDF en documents Word."},
+    "fr/forgot-password.html": {"lang": "fr", "index": false, "title": "Mot de passe oublié – PDF2Wordly", "description": "Réinitialisez le mot de passe de votre compte PDF2Wordly."},
+    "fr/reset-password.html": {"lang": "fr", "index": false, "title": "Nouveau mot de passe – PDF2Wordly", "description": "Choisissez un nouveau mot de passe pour votre compte PDF2Wordly."},
+    "ar/login.html": {"lang": "ar", "index": false, "title": "تسجيل الدخول أو إنشاء حساب – PDF2Wordly", "description": "سجّل الدخول أو أنشئ حسابًا مجانيًا في PDF2Wordly لتحويل ملفات PDF إلى مستندات Word."},
+    "ar/forgot-password.html": {"lang": "ar", "index": false, "title": "نسيت كلمة المرور – PDF2Wordly", "description": "أعد تعيين كلمة مرور حسابك في PDF2Wordly."},
+    "ar/reset-password.html": {"lang": "ar", "index": false, "title": "إعادة تعيين كلمة المرور – PDF2Wordly", "description": "عيّن كلمة مرور جديدة لحسابك في PDF2Wordly."},
+    "404.html": {"lang": "en", "index": false, "title": "Page not found | PDF2Wordly", "description": "This page doesn't exist. Convert PDF to Word, read our guides, or go to the French or Arabic site."}
+  }
+}

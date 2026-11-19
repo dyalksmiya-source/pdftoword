@@ -169,16 +169,18 @@ const answer = (status, body = {}) => async (url, opts) => { answer.last = { url
     ok(s.includes('mailto:support@pdf2wordly.com') && s.includes(`href="${pre}account.html"`) && s.includes('Paddle') && s.includes('DELETE'), `${f}: steps, Paddle, email fallback`);
     ok(['website', 'app', 'pro', 'deleted', 'kept', 'email'].every(id => s.includes(`<article id="${id}" class="legal-section">`)), `${f}: 6 sections`);
     ok(s.includes('href="/delete-account.html"') && s.includes('href="/fr/delete-account.html"') && s.includes('href="/ar/delete-account.html"'), `${f}: language switcher points to this page`);
-    ok(!s.includes('application/ld+json') && !s.includes('billing.js" defer') && !s.includes('id="proCta"') && !s.includes('id="converter"'), `${f}: no home-page leftovers`);
+    const ldTags = s.match(/<script type="application\/ld\+json"[^>]*>/g) || [];
+    ok(ldTags.length === 1 && ldTags[0].includes('data-seo="site"') && !s.includes('"FAQPage"') && !s.includes('WebApplication'), `${f}: only the site-wide structured data (Organization + WebSite)`);
+    ok(!s.includes('billing.js" defer') && !s.includes('id="proCta"') && !s.includes('id="converter"'), `${f}: no home-page leftovers`);
   }
 
   // ---- footer link on every page, next to Privacy
   const all = fs.readdirSync(SITE).filter(f => f.endsWith('.html')).concat(['fr/index.html', 'ar/index.html', 'fr/delete-account.html', 'ar/delete-account.html'])
     .filter(f => read(f).includes('class="footer-legal"'));
-  ok(all.length === 26, 'pages with the legal footer: 26');
+  ok(all.length === 27, 'pages with the legal footer: 27 (incl. 404.html)');
   for (const f of all) {
     const nav = read(f).match(/<nav class="footer-legal"[^>]*>.*?<\/nav>/)[0];
-    ok(/privacy\.html">[^<]*<\/a><a href="delete-account\.html">(Delete account|Supprimer le compte|حذف الحساب)<\/a>/.test(nav), `${f}: footer "Delete account" after Privacy`);
+    ok(/privacy\.html">[^<]*<\/a><a href="\/?delete-account\.html">(Delete account|Supprimer le compte|حذف الحساب)<\/a>/.test(nav), `${f}: footer "Delete account" after Privacy`);
   }
 
   // ---- privacy / terms / sitemap

@@ -332,5 +332,44 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
     ok(css.includes('.account-actions>[hidden]{display:none}'), 'css: hidden button really hidden (beats .btn display)');
   }
 
+  // ---- Paddle.js only when needed (page speed)
+  {
+    let release;
+    const gate = () => new Promise(r => { release = r; });
+    const doc = homePage(); const w = windowMock({ paddle: false });
+    let loads = 0;
+    doc.head.onAppend = s => { loads++; w.Paddle = paddleMock(); s.onload(); };
+    const pending = B.init(doc, w, signedIn, meFetch({ plan: 'free' }), undefined, { waitUntilNeeded: gate });
+    await new Promise(r => setTimeout(r, 0));
+    ok(loads === 0 && doc.getElementById('proCta').disabled, 'lazy: Paddle.js not loaded before it is needed, button still disabled');
+    release();
+    ok(await pending === 'ready' && loads === 1 && doc.getElementById('proCta').tagName === 'BUTTON' && !doc.getElementById('proCta').disabled,
+       'lazy: loaded once needed, checkout button ready');
+  }
+  {
+    const btn = el('button', { id: 'proCta' });
+    const instant = await Promise.race([B.whenNeeded({ getElementById: () => null }, { location: { hash: '#pricing' } }, btn).then(() => 'now'),
+                                        new Promise(r => setTimeout(() => r('later'), 20))]);
+    ok(instant === 'now', 'whenNeeded: page opened on #pricing -> at once');
+    let cb = null; let observed = null; let disconnected = false;
+    function IO(fn) { cb = fn; }
+    IO.prototype.observe = function (t) { observed = t; };
+    IO.prototype.disconnect = function () { disconnected = true; };
+    const pricing = el('section', { id: 'pricing' });
+    const p1 = B.whenNeeded({ getElementById: id => (id === 'pricing' ? pricing : null) }, { location: { hash: '' }, IntersectionObserver: IO }, el('button'));
+    ok(observed === pricing, 'whenNeeded: watches the pricing section');
+    cb([{ isIntersecting: true }]);
+    await p1;
+    ok(disconnected, 'whenNeeded: pricing near the screen -> load, observer stopped');
+    const b2 = el('button');
+    const p2 = B.whenNeeded({ getElementById: () => null }, { location: { hash: '' }, IntersectionObserver: IO }, b2);
+    b2.listeners.pointerenter[0]();
+    await p2;
+    ok(true, 'whenNeeded: pointing at the Pro button -> load');
+    const p3 = await Promise.race([B.whenNeeded({ getElementById: () => null }, { location: { hash: '' } }, el('button')).then(() => 'now'),
+                                   new Promise(r => setTimeout(() => r('later'), 20))]);
+    ok(p3 === 'now', 'whenNeeded: no IntersectionObserver -> at once');
+  }
+
   console.log(`\n${passed} passed`);
 })().catch(e => { console.error(e.message); process.exit(1); });
