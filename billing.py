@@ -36,6 +36,13 @@ Lifecycle (tests: _tests/test_billing.py, LifecycleTests):
                    then cancel immediately; adjustment.* is not handled).
   paused / resumed paused = Free; resumed sets the new period
   late transaction never moves the date of a canceled or paused subscription
+  refund           adjustment.created / .updated with action "refund" and status
+                   "approved" -> profiles.refunded_at + a public.paddle_refunds
+                   row (kept even if the account is deleted). One refund per
+                   customer: such a profile, Paddle customer or email can never
+                   buy Pro again (/api/me can_purchase=false). If one still pays,
+                   Pro is granted (they paid) and the event is stored as
+                   "conflict" for review.
 
 Logging: only event_id, event_type, whether a user was found, and the result.
 Never the signature, a key or secret, the body, or personal data.
@@ -71,13 +78,16 @@ SUBSCRIPTION_EVENTS = {
     "subscription.resumed",
 }
 TRANSACTION_EVENTS = {"transaction.completed"}
-HANDLED_EVENTS = SUBSCRIPTION_EVENTS | TRANSACTION_EVENTS
+ADJUSTMENT_EVENTS = {"adjustment.created", "adjustment.updated"}
+HANDLED_EVENTS = SUBSCRIPTION_EVENTS | TRANSACTION_EVENTS | ADJUSTMENT_EVENTS
+# Events that mean "this customer paid for a (new) subscription".
+PURCHASE_EVENTS = {"subscription.created", "subscription.activated", "transaction.completed"}
 
 # Columns read from public.profiles by this module and by server.py.
 PROFILE_COLUMNS = (
-    "id, plan, subscription_status, subscription_id, current_period_end, "
+    "id, email, plan, subscription_status, subscription_id, current_period_end, "
     "last_free_conversion_at, billing_source, paddle_customer_id, "
-    "paddle_subscription_id, cancel_at, paddle_last_event_at"
+    "paddle_subscription_id, cancel_at, paddle_last_event_at, refunded_at"
 )
 
 
@@ -285,6 +295,23 @@ class SupabaseStore:
         fields = dict(fields, updated_at=_now().isoformat())
         self.db.table("profiles").update(fields).eq("id", user_id).execute()
 
+    def insert_refund(self, row):
+        """Record an approved refund once (adjustment_id is the key)."""
+        try:
+            self.db.table("paddle_refunds").insert(row).execute()
+            return True
+        except Exception as exc:
+            code = str(getattr(exc, "code", "") or "")
+            if code == "23505" or "23505" in str(exc) or "duplicate key" in str(exc):
+                return False
+            raise
+
+    def find_refunds(self, column, value):
+        resp = self.db.table("paddle_refunds").select(
+            "adjustment_id, paddle_customer_id, paddle_subscription_id, refunded_at"
+        ).eq(column, value).limit(20).execute()
+        return getattr(resp, "data", None) or []
+
 
 # ---------------------------------------------------------------------------
 # Paddle API (server side)
@@ -331,6 +358,44 @@ def create_portal_session(customer_id, subscription_id):
 # ---------------------------------------------------------------------------
 # Event processing
 # ---------------------------------------------------------------------------
+
+def _refunds_for(store, profile, customer_id=None):
+    """Refund rows for this profile's Paddle customer(s) or email."""
+    rows = []
+    seen = set()
+    for column, value in (("paddle_customer_id", customer_id),
+                          ("paddle_customer_id", (profile or {}).get("paddle_customer_id")),
+                          ("customer_email", str((profile or {}).get("email") or "").strip().lower())):
+        if value and (column, value) not in seen:
+            seen.add((column, value))
+            rows.extend(store.find_refunds(column, value))
+    return rows
+
+
+def purchase_blocked(store, profile, customer_id=None):
+    """One refund per customer: True if this profile, its Paddle customer or
+    its email already had an approved refund."""
+    if not profile:
+        return False
+    if profile.get("refunded_at"):
+        return True
+    return bool(_refunds_for(store, profile, customer_id))
+
+
+def can_purchase(store, profile):
+    """For /api/me. If the check itself fails, allow (the webhook still flags
+    a blocked purchase as "conflict")."""
+    try:
+        return not purchase_blocked(store, profile)
+    except Exception as exc:
+        logger.error("can_purchase check failed (%s)", _exc_name(exc))
+        return True
+
+
+def _is_refund_approved(data):
+    return (str(data.get("action") or "").lower() == "refund"
+            and str(data.get("status") or "").lower() == "approved")
+
 
 def _find_user(store, data, customer_id, subscription_id):
     """Returns (profile, matched_by) or (None, None)."""
@@ -433,6 +498,11 @@ def process_event(store, event, now=None):
             logger.warning("Paddle event %s (%s): unexpected price", event_id, event_type)
 
         profile, _matched_by = _find_user(store, data, customer_id, subscription_id)
+
+        if event_type in ADJUSTMENT_EVENTS:
+            return _apply_adjustment(store, event_id, data, occurred_at, profile,
+                                     customer_id, subscription_id, now)
+
         if not profile:
             store.update_event(event_id, {
                 "status": "unmatched",
@@ -441,6 +511,15 @@ def process_event(store, event, now=None):
             return "unmatched", False
 
         user_id = profile["id"]
+        # One refund per customer: a refunded customer who still pays for a NEW
+        # subscription gets Pro (they paid) but the event is kept for review.
+        blocked_purchase = False
+        if event_type in PURCHASE_EVENTS:
+            refunds = _refunds_for(store, profile, customer_id)
+            refunded_subs = {r.get("paddle_subscription_id") for r in refunds}
+            if (profile.get("refunded_at") or refunds) and subscription_id not in refunded_subs:
+                blocked_purchase = True
+
         if _is_conflict(profile, subscription_id, now):
             store.update_event(event_id, {"status": "conflict", "user_id": user_id})
             return "conflict", True
@@ -474,6 +553,10 @@ def process_event(store, event, now=None):
         if subscription_id:
             fields["paddle_subscription_id"] = subscription_id
         store.update_profile(user_id, fields)
+        if blocked_purchase:
+            logger.warning("Paddle event %s (%s): purchase after a refund, review it", event_id, event_type)
+            store.update_event(event_id, {"status": "conflict", "user_id": user_id})
+            return "conflict", True
         store.update_event(event_id, {"status": "processed", "user_id": user_id})
         return "processed", True
     except Exception:
@@ -483,6 +566,31 @@ def process_event(store, event, now=None):
             logger.error("Paddle event %s: could not remove the event row (%s)",
                          event_id, _exc_name(exc))
         raise
+
+
+def _apply_adjustment(store, event_id, data, occurred_at, profile, customer_id, subscription_id, now):
+    """adjustment.created / .updated. Only an APPROVED REFUND changes anything."""
+    if not _is_refund_approved(data):
+        store.update_event(event_id, {"status": "ignored",
+                                      "user_id": profile["id"] if profile else None})
+        return "ignored", bool(profile)
+    refunded_at = occurred_at or now.isoformat()
+    email = (profile or {}).get("email") or lookup_customer_email(customer_id)
+    store.insert_refund({
+        "adjustment_id": str(data.get("id") or event_id),
+        "paddle_customer_id": customer_id,
+        "paddle_subscription_id": subscription_id,
+        "customer_email": str(email).strip().lower() if email else None,
+        "user_id": profile["id"] if profile else None,
+        "refunded_at": refunded_at,
+    })
+    if not profile:
+        store.update_event(event_id, {"status": "unmatched", "customer_email": email})
+        return "unmatched", False
+    if not profile.get("refunded_at"):  # keep the first refund date
+        store.update_profile(profile["id"], {"refunded_at": refunded_at})
+    store.update_event(event_id, {"status": "processed", "user_id": profile["id"]})
+    return "processed", True
 
 
 # ---------------------------------------------------------------------------

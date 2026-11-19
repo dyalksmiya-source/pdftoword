@@ -86,7 +86,17 @@ class FakeStore:
     def __init__(self, profiles=()):
         self.profiles = {p["id"]: dict(p) for p in profiles}
         self.events = {}
+        self.refunds = {}
         self.fail_profile_update = False
+
+    def insert_refund(self, row):
+        if row["adjustment_id"] in self.refunds:
+            return False
+        self.refunds[row["adjustment_id"]] = dict(row)
+        return True
+
+    def find_refunds(self, column, value):
+        return [dict(r) for r in self.refunds.values() if r.get(column) == value]
 
     def insert_event(self, row):
         if row["event_id"] in self.events:
@@ -514,6 +524,116 @@ class LifecycleTests(WebhookTestCase):
 
 
 # ---------------------------------------------------------------------------
+# 2c. Refunds: one refund per customer, ever
+# ---------------------------------------------------------------------------
+def adjustment_event(event_type="adjustment.created", status="approved", action="refund",
+                     event_id="evt_adj", sub="sub_01", customer="ctm_01", adj="adj_01", occurred=None):
+    return {"event_id": event_id, "event_type": event_type, "occurred_at": occurred or iso(NOW),
+            "data": {"id": adj, "action": action, "status": status, "transaction_id": "txn_01",
+                     "subscription_id": sub, "customer_id": customer, "reason": "Customer request",
+                     "items": [{"item_id": "txnitm_01", "type": "full"}]}}
+
+
+class RefundTests(WebhookTestCase):
+    def setUp(self):
+        super().setUp()
+        self.store.profiles[USER].update(email="eve@example.com", paddle_customer_id="ctm_01",
+                                         paddle_subscription_id="sub_01", plan="pro",
+                                         subscription_status="active",
+                                         current_period_end=iso(NOW + timedelta(days=20)))
+
+    def p(self):
+        return self.store.profiles[USER]
+
+    def test_approved_refund_marks_profile_and_records_refund(self):
+        r = self.post(adjustment_event())
+        self.assertEqual(r.get_json()["result"], "processed")
+        self.assertEqual(self.p()["refunded_at"], iso(NOW))
+        row = self.store.refunds["adj_01"]
+        self.assertEqual((row["paddle_customer_id"], row["paddle_subscription_id"], row["customer_email"], row["user_id"]),
+                         ("ctm_01", "sub_01", "eve@example.com", USER))
+        self.assertEqual(self.store.events["evt_adj"]["status"], "processed")
+
+    def test_pending_or_other_adjustments_change_nothing(self):
+        for i, (status, action) in enumerate([("pending_approval", "refund"), ("rejected", "refund"), ("approved", "credit"), ("approved", "chargeback")]):
+            r = self.post(adjustment_event(status=status, action=action, event_id=f"evt_{i}", adj=f"adj_{i}"))
+            self.assertEqual(r.get_json()["result"], "ignored", (status, action))
+        self.assertNotIn("refunded_at", self.p())
+        self.assertEqual(self.store.refunds, {})
+
+    def test_created_then_updated_is_idempotent(self):
+        self.post(adjustment_event(status="pending_approval", event_id="e1"))
+        self.post(adjustment_event(event_type="adjustment.updated", status="approved", event_id="e2"))
+        first = self.p()["refunded_at"]
+        self.post(adjustment_event(event_type="adjustment.updated", status="approved", event_id="e3",
+                                   occurred=iso(NOW + timedelta(hours=1))))
+        self.assertEqual(self.p()["refunded_at"], first, "first refund date kept")
+        self.assertEqual(len(self.store.refunds), 1)
+        self.assertEqual(self.post(adjustment_event(event_type="adjustment.updated", event_id="e2")).get_json()["result"], "duplicate")
+
+    def test_match_by_customer_when_subscription_unknown(self):
+        self.p()["paddle_subscription_id"] = "sub_other"
+        self.post(adjustment_event(sub="sub_old"))
+        self.assertIsNotNone(self.p().get("refunded_at"))
+
+    def test_unmatched_refund_is_stored_and_still_recorded(self):
+        self.store.profiles.clear()
+        r = self.post(adjustment_event(customer="ctm_x", sub="sub_x"))
+        self.assertEqual(r.get_json()["result"], "unmatched")
+        self.assertEqual(self.store.events["evt_adj"]["status"], "unmatched")
+        self.assertIn("adj_01", self.store.refunds, "a refund is remembered even without an account")
+
+    def test_purchase_after_refund_grants_pro_but_is_a_conflict(self):
+        self.post(adjustment_event())
+        # support cancels immediately (refund.md)
+        self.post(subscription_event("subscription.canceled", status="canceled", event_id="evt_c",
+                                     canceled_at=iso(NOW + timedelta(minutes=1)), occurred=iso(NOW + timedelta(minutes=1))))
+        self.assertEqual(self.store.events["evt_c"]["status"], "processed", "the refunded subscription's own events are not flagged")
+        later = NOW + timedelta(minutes=10)
+        r = self.post(subscription_event("subscription.activated", event_id="evt_new", sub="sub_new",
+                                         period_end=iso(later + timedelta(days=30)), occurred=iso(later)))
+        self.assertEqual(r.get_json()["result"], "conflict")
+        self.assertEqual(self.store.events["evt_new"]["status"], "conflict")
+        self.assertEqual(self.p()["paddle_subscription_id"], "sub_new")
+        self.assertTrue(billing.is_pro(self.p(), now=later + timedelta(minutes=1)), "they paid: Pro is granted")
+
+    def test_new_account_same_paddle_customer_is_a_conflict(self):
+        # refund recorded for a customer whose account was deleted since
+        self.store.refunds["adj_old"] = {"adjustment_id": "adj_old", "paddle_customer_id": "ctm_01",
+                                         "paddle_subscription_id": "sub_old", "customer_email": "old@example.com",
+                                         "user_id": None, "refunded_at": iso(NOW - timedelta(days=40))}
+        self.p().update(plan="free", subscription_status=None, paddle_subscription_id=None)
+        r = self.post(transaction_event(event_id="evt_t", sub="sub_new", customer="ctm_01",
+                                        period_end=iso(NOW + timedelta(days=30))))
+        self.assertEqual(r.get_json()["result"], "conflict")
+
+    def test_purchase_blocked_rules(self):
+        st = FakeStore()
+        self.assertFalse(billing.purchase_blocked(st, {"id": USER, "email": "a@b.co"}))
+        self.assertTrue(billing.purchase_blocked(st, {"id": USER, "refunded_at": iso(NOW)}))
+        st.refunds["x"] = {"adjustment_id": "x", "paddle_customer_id": "ctm_9", "customer_email": "a@b.co"}
+        self.assertTrue(billing.purchase_blocked(st, {"id": USER, "email": "A@B.co "}), "same email (new account)")
+        self.assertTrue(billing.purchase_blocked(st, {"id": USER, "paddle_customer_id": "ctm_9"}), "same Paddle customer")
+        self.assertFalse(billing.purchase_blocked(st, None))
+
+    def test_can_purchase_fails_open(self):
+        class Broken(FakeStore):
+            def find_refunds(self, column, value):
+                raise RuntimeError("table missing")
+        self.assertTrue(billing.can_purchase(Broken(), {"id": USER, "email": "a@b.co"}))
+        self.assertFalse(billing.can_purchase(FakeStore(), {"id": USER, "refunded_at": iso(NOW)}))
+
+    def test_supabase_store_refund_duplicate(self):
+        class APIError(Exception):
+            code = "23505"
+        table = mock.Mock()
+        table.insert.return_value.execute.side_effect = APIError("duplicate key value")
+        admin = mock.Mock()
+        admin.table.return_value = table
+        self.assertFalse(billing.SupabaseStore(admin).insert_refund({"adjustment_id": "a"}))
+
+
+# ---------------------------------------------------------------------------
 # 3. Unmatched events (no user found)
 # ---------------------------------------------------------------------------
 class UnmatchedTests(WebhookTestCase):
@@ -759,6 +879,16 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(body["ends_at"], end)
         self.assertIsNone(body["renews_at"])
         self.assertEqual(body["billing_source"], "paddle")
+        self.assertIs(body["can_purchase"], True)
+        self.assertEqual(body["pro_daily_limit"], 100)
+
+    def test_me_can_purchase_false_after_refund(self):
+        row = {"id": USER, "email": "eve@example.com", "plan": "free", "subscription_status": "canceled",
+               "refunded_at": iso(datetime.now(timezone.utc))}
+        with mock.patch.object(self.server, "get_authenticated_user_id", return_value=(USER, None)), \
+                mock.patch.object(self.server, "_supabase_admin", return_value=self.fake_admin(row)):
+            body = self.server.app.test_client().get("/api/me").get_json()
+        self.assertIs(body["can_purchase"], False)
 
     def test_server_pro_check_uses_date_rule(self):
         past = iso(datetime.now(timezone.utc) - timedelta(days=1))
@@ -878,12 +1008,79 @@ class ClaimCompatNewServerTests(ClaimCompat, unittest.TestCase):
         import server  # noqa: F401
         cls.server = sys.modules["server"]
 
-    def test_pro_user_skips_claim(self):
+    def test_pro_user_skips_free_claim_but_uses_fair_use(self):
         code, _, calls = self.run_convert(
             self.free(plan="pro", subscription_status="canceled",
                       current_period_end=iso(datetime.now(timezone.utc) + timedelta(days=3))))
         self.assertEqual(code, 200)
-        self.assertEqual(calls, [])
+        self.assertEqual([c[0] for c in calls], ["claim_pro_conversion"])
+        self.assertEqual(calls[0][1], {"p_user_id": USER, "p_limit": 100})
+
+    # ---- Pro fair use (100 per rolling 24 h) --------------------------------
+    def run_pro(self, pro_result=None, pro_error=None, fail_conversion=False):
+        srv = self.server
+        admin = mock.Mock()
+        chain = mock.Mock()
+        chain.select.return_value = chain
+        chain.eq.return_value = chain
+        chain.limit.return_value = chain
+        chain.execute.return_value = mock.Mock(data=[self.free(plan="pro", subscription_status="active")])
+        admin.table.return_value = chain
+        calls = []
+
+        def rpc(name, params):
+            calls.append((name, params))
+            call = mock.Mock()
+            if name == "claim_pro_conversion" and pro_error:
+                call.execute.side_effect = pro_error
+            else:
+                call.execute.return_value = mock.Mock(data=pro_result if name == "claim_pro_conversion" else None)
+            return call
+
+        admin.rpc.side_effect = rpc
+
+        def convert(_inp, out):
+            if fail_conversion:
+                raise RuntimeError("conversion failed")
+            Path(out).write_bytes(b"PK fake docx")
+
+        with mock.patch.object(srv, "get_authenticated_user_id", return_value=(USER, None)), \
+                mock.patch.object(srv, "_supabase_admin", return_value=admin), \
+                mock.patch.object(srv, "run_conversion", side_effect=convert):
+            from io import BytesIO
+            r = srv.app.test_client().post("/api/convert", content_type="multipart/form-data",
+                                           data={"file": (BytesIO(tiny_pdf()), "doc.pdf")})
+            body = r.get_data()
+            r.close()
+        return r.status_code, body, calls
+
+    def test_fair_use_allowed(self):
+        code, _, calls = self.run_pro({"allowed": True, "reason": "ok", "count": 7, "claim_id": 41})
+        self.assertEqual(code, 200)
+        self.assertEqual([c[0] for c in calls], ["claim_pro_conversion"])
+
+    def test_fair_use_limit_reached_is_429(self):
+        code, body, calls = self.run_pro({"allowed": False, "reason": "daily_limit", "count": 100,
+                                          "retry_after_seconds": 3600})
+        self.assertEqual(code, 429)
+        data = json.loads(body)
+        self.assertEqual((data["code"], data["retry_after_seconds"], data["limit"]), ("DAILY_LIMIT_REACHED", 3600, 100))
+        self.assertIn("fair-use limit of 100 files in 24 hours", data["error"])
+
+    def test_fair_use_released_when_the_conversion_fails(self):
+        code, _, calls = self.run_pro({"allowed": True, "claim_id": 42}, fail_conversion=True)
+        self.assertEqual(code, 500)
+        self.assertEqual(calls[-1], ("release_pro_conversion", {"p_user_id": USER, "p_claim_id": 42}))
+
+    def test_fair_use_check_error_does_not_block_a_paying_user(self):
+        code, _, calls = self.run_pro(pro_error=Exception("function claim_pro_conversion does not exist"))
+        self.assertEqual(code, 200)
+        self.assertNotIn("release_pro_conversion", [c[0] for c in calls])
+
+    def test_free_user_has_no_fair_use_claim(self):
+        code, _, calls = self.run_convert(self.free(), {"allowed": True, "reason": "first_conversion", "previous": None})
+        self.assertEqual(code, 200)
+        self.assertNotIn("claim_pro_conversion", [c[0] for c in calls])
 
 
 # ---------------------------------------------------------------------------

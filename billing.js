@@ -9,8 +9,9 @@
  * polls GET /api/me until the Paddle webhook has activated Pro, then asks
  * plan-ui.js (window.pwPlan) to update the header, menu and pricing card.
  *
- * Guard: the checkout never opens for a Pro user. The plan shown on the page
- * is checked first, then GET /api/me is asked again right before opening.
+ * Guard: the checkout never opens for a Pro user, nor after a refund (one
+ * refund per customer: /api/me can_purchase=false). The plan shown on the
+ * page is checked first, then GET /api/me is asked again right before opening.
  */
 (function () {
   'use strict';
@@ -43,6 +44,7 @@
       failed: 'The checkout could not open. Please try again later.',
       alreadyPro: 'You already have Pro. Manage it from your account settings.',
       checkFailed: 'We couldn’t check your plan. Please try again.',
+      refunded: 'Pro can’t be purchased again on this account after a refund. Contact support@pdf2wordly.com.',
     },
     fr: {
       subscribe: 'S’abonner – {price}/mois',
@@ -52,6 +54,7 @@
       failed: 'Le paiement n’a pas pu s’ouvrir. Veuillez réessayer plus tard.',
       alreadyPro: 'Vous avez déjà Pro. Gérez-le depuis les paramètres du compte.',
       checkFailed: 'Impossible de vérifier votre formule. Veuillez réessayer.',
+      refunded: 'Pro ne peut plus être acheté sur ce compte après un remboursement. Contactez support@pdf2wordly.com.',
     },
     ar: {
       subscribe: 'اشترك – {price} شهريًا',
@@ -61,6 +64,7 @@
       failed: 'تعذّر فتح صفحة الدفع. يُرجى المحاولة لاحقًا.',
       alreadyPro: 'لديك Pro بالفعل. يمكنك إدارته من إعدادات الحساب.',
       checkFailed: 'تعذّر التحقق من خطتك. يُرجى المحاولة مرة أخرى.',
+      refunded: 'لا يمكن شراء Pro مرة أخرى على هذا الحساب بعد استرداد المبلغ. تواصل مع support@pdf2wordly.com.',
     },
   };
 
@@ -295,6 +299,10 @@
           say(t.alreadyPro);
           return 'already-pro';
         }
+        if (win.pwPlan && win.pwPlan.me && win.pwPlan.me.can_purchase === false) {
+          say(t.refunded);
+          return 'refunded';
+        }
         // Guard 2: ask the server again right before opening.
         var me = await fetchMe(fetchImpl, api + '/api/me', s.access_token);
         if (!me) {
@@ -305,6 +313,10 @@
           if (win.pwPlan) win.pwPlan.update(me, s.user.id);
           say(t.alreadyPro);
           return 'already-pro';
+        }
+        if (me.can_purchase === false) {
+          say(t.refunded);
+          return 'refunded';
         }
         try {
           paddle.Checkout.open({

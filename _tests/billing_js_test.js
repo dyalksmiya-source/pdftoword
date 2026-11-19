@@ -132,6 +132,32 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
     await B.init(doc = homePage(), w = windowMock({ paddle: p }), signedIn, async () => { throw new Error('net'); });
     ok((await doc.getElementById('proCta').click())[0] === 'check-failed' && !p.opened, 'guard: network error -> no checkout');
   }
+  // ---- one refund per customer: no checkout after a refund
+  {
+    const p = paddleMock(); doc = homePage();
+    w = windowMock({ paddle: p });
+    w.pwPlan = { state: 'free', me: { plan: 'free', can_purchase: false }, update() {} };
+    meFetch.calls = 0;
+    await B.init(doc, w, signedIn, meFetch({ plan: 'free', can_purchase: false }));
+    const [res] = await doc.getElementById('proCta').click();
+    ok(res === 'refunded' && !p.opened && meFetch.calls === 0, 'refund: page already knows (can_purchase=false) -> no checkout');
+    ok(doc.card.children[1].textContent === 'Pro can’t be purchased again on this account after a refund. Contact support@pdf2wordly.com.', 'refund: message (en)');
+  }
+  for (const [lang, msg] of [['fr', 'Pro ne peut plus être acheté sur ce compte après un remboursement. Contactez support@pdf2wordly.com.'],
+                             ['ar', 'لا يمكن شراء Pro مرة أخرى على هذا الحساب بعد استرداد المبلغ. تواصل مع support@pdf2wordly.com.']]) {
+    const p = paddleMock(); doc = homePage(lang);
+    w = windowMock({ path: `/${lang}/`, paddle: p });
+    await B.init(doc, w, signedIn, meFetch({ plan: 'free', can_purchase: false }));
+    const [res] = await doc.getElementById('proCta').click();
+    ok(res === 'refunded' && !p.opened && doc.card.children[1].textContent === msg, `refund: fresh /api/me says can_purchase=false -> no checkout (${lang})`);
+  }
+  {
+    const p = paddleMock(); doc = homePage();
+    w = windowMock({ paddle: p });
+    await B.init(doc, w, signedIn, meFetch({ plan: 'free', can_purchase: true }));
+    const [res] = await doc.getElementById('proCta').click();
+    ok(res === 'opened' && p.opened, 'can_purchase=true -> checkout opens');
+  }
   {
     // double click: only one check / one checkout at a time
     const p = paddleMock(); doc = homePage();

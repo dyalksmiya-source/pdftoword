@@ -67,7 +67,9 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
 - `GET /api/health` — public.
 - `GET /api/me` — needs `Authorization: Bearer <supabase access token>`;
   returns display-only `{ plan, subscription_status, current_period_end,
-  renews_at, ends_at, cancel_scheduled, billing_source }`.
+  renews_at, ends_at, cancel_scheduled, billing_source, can_purchase,
+  pro_daily_limit }`. `can_purchase` is false after an approved refund (one
+  refund per customer; `adjustment.*` webhooks, migration 003).
 - `POST /api/paddle/webhook` — Paddle only; `Paddle-Signature` verified on the
   raw body (5-minute window), idempotent via `public.paddle_events`.
 - `DELETE /api/account` — same auth; JSON `{"confirm": "DELETE"}`. Deletes the
@@ -80,7 +82,9 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   `{ overview_url, cancel_url, update_payment_url }` (503 without `PADDLE_API_KEY`).
 - `POST /api/convert` — same auth; multipart field `file`. Machine-readable
   error codes: `AUTH_REQUIRED`, `INVALID_TOKEN`, `PROFILE_NOT_FOUND`,
-  `FREE_LIMIT_REACHED` (HTTP 429 + `retry_after_seconds`), `CONVERSION_FAILED`,
+  `FREE_LIMIT_REACHED` (HTTP 429 + `retry_after_seconds`), `DAILY_LIMIT_REACHED`
+  (Pro fair use: `PRO_DAILY_LIMIT`, default 100 per rolling 24 h; HTTP 429 +
+  `retry_after_seconds` + `limit`), `CONVERSION_FAILED`,
   `SERVER_ERROR`.
 
 ## Notes

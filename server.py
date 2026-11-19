@@ -12,8 +12,10 @@ Security model (server-enforced, never trust the frontend):
   3. Free vs Pro is read from public.profiles in Supabase (service-role).
      Free = one successful conversion per rolling 24h, enforced with an
      atomic claim/release RPC so simultaneous requests cannot double-spend.
-     Pro = unlimited. Paddle subscriptions update the profile through the
-     signed webhook in billing.py, which also holds the Pro rule.
+     Pro = fair use: at most PRO_DAILY_LIMIT (100) successful conversions per
+     rolling 24h, counted atomically in Postgres (claim_pro_conversion) and
+     released again when a conversion fails. Paddle subscriptions update the
+     profile through the signed webhook in billing.py (Pro rule, refunds).
   4. The Free timestamp is only consumed when conversion SUCCEEDS. On
      failure the claim is released (previous timestamp restored).
 
@@ -87,6 +89,10 @@ OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+fra+ara")
 FREE_MAX_PAGES = 20
 PRO_MAX_PAGES = 200
 
+# Pro fair use: successful conversions per rolling 24 hours. The site shows
+# the same number from _tools/site-config.json ("pro-daily-limit").
+PRO_DAILY_LIMIT = int(os.environ.get("PRO_DAILY_LIMIT", "100"))
+
 # Temp files older than this are purged (startup + before each conversion).
 TEMP_DIR = Path(tempfile.gettempdir()) / "pdf2wordly"
 TEMP_MAX_AGE_SECONDS = 30 * 60
@@ -158,17 +164,24 @@ def is_user_pro(profile):
 
 
 def get_profile(admin, user_id):
-    """Load the caller's profile with the service-role client (bypasses RLS)."""
-    try:
-        resp = admin.table("profiles").select(billing.PROFILE_COLUMNS) \
-            .eq("id", user_id).limit(1).execute()
-    except Exception:
-        # Migration 002 not run yet: fall back to the columns of migration 001.
-        logger.warning("profiles billing columns missing; run migration 002")
-        resp = admin.table("profiles").select(
-            "id, plan, subscription_status, subscription_id, "
-            "current_period_end, last_free_conversion_at"
-        ).eq("id", user_id).limit(1).execute()
+    """Load the caller's profile with the service-role client (bypasses RLS).
+
+    Falls back to older column sets while a migration has not been run yet
+    (003 adds refunded_at, 002 the Paddle columns)."""
+    column_sets = (
+        billing.PROFILE_COLUMNS,
+        billing.PROFILE_COLUMNS.replace(", refunded_at", ""),
+        "id, plan, subscription_status, subscription_id, current_period_end, last_free_conversion_at",
+    )
+    resp = None
+    for i, columns in enumerate(column_sets):
+        try:
+            resp = admin.table("profiles").select(columns).eq("id", user_id).limit(1).execute()
+            break
+        except Exception:
+            if i == len(column_sets) - 1:
+                raise
+            logger.warning("profiles columns missing; run the latest migration")
     rows = getattr(resp, "data", None) or []
     return rows[0] if rows else None
 
@@ -307,6 +320,10 @@ def me():
         "subscription_status": profile.get("subscription_status"),
         "current_period_end": profile.get("current_period_end"),
         **billing.billing_summary(profile),
+        # One refund per customer: False after a refund (billing.js refuses
+        # to open the checkout).
+        "can_purchase": billing.can_purchase(billing.SupabaseStore(admin), profile),
+        "pro_daily_limit": PRO_DAILY_LIMIT,
     })
 
 
@@ -459,6 +476,7 @@ def convert():
     pro = is_user_pro(profile)
     claimed = False
     claim_prev = None
+    pro_claim_id = None
 
     # 4. Free users: atomically claim their 24h slot (race-safe RPC that
     #    locks the row). Pro users skip this entirely (unlimited).
@@ -495,6 +513,31 @@ def convert():
             return jsonify({"code": "SERVER_ERROR",
                             "error": "Something went wrong. Please try again later."}), 500
 
+    # 4b. Pro fair use: at most PRO_DAILY_LIMIT successful conversions per
+    #     rolling 24h (atomic RPC with a row lock; released if the conversion
+    #     fails). If the check itself fails, a paying user is not blocked.
+    if pro:
+        try:
+            claim = admin.rpc("claim_pro_conversion",
+                              {"p_user_id": user_id, "p_limit": PRO_DAILY_LIMIT}).execute()
+            claim_data = getattr(claim, "data", None)
+            row = claim_data[0] if isinstance(claim_data, list) and claim_data else claim_data
+            if isinstance(row, dict) and row.get("allowed") is False:
+                payload = {"code": "DAILY_LIMIT_REACHED",
+                           "error": (f"You have reached the fair-use limit of {PRO_DAILY_LIMIT} "
+                                     "files in 24 hours. Please try again later."),
+                           "limit": PRO_DAILY_LIMIT}
+                try:
+                    payload["retry_after_seconds"] = max(0, int(row.get("retry_after_seconds")))
+                except (TypeError, ValueError):
+                    pass
+                logger.info("Pro fair-use limit reached")
+                return jsonify(payload), 429
+            if isinstance(row, dict) and row.get("claim_id") is not None:
+                pro_claim_id = row.get("claim_id")
+        except Exception as exc:
+            logger.error("Pro fair-use claim failed (%s); conversion allowed", type(exc).__name__)
+
     # 5. Store upload in a safe temp dir under a random name; verify magic bytes.
     job_id = uuid.uuid4().hex
     tmp_dir = TEMP_DIR
@@ -503,8 +546,7 @@ def convert():
         purge_old_temp_files()
     except OSError:
         logger.exception("Could not create temp dir")
-        if claimed:
-            _release_claim(admin, user_id, claim_prev)
+        _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
         return jsonify({"code": "SERVER_ERROR",
                         "error": "Something went wrong. Please try again later."}), 500
     input_path = str(tmp_dir / f"{job_id}.pdf")
@@ -519,8 +561,7 @@ def convert():
             magic = fh.read(5)
         if magic != b"%PDF-":
             cleanup_files(input_path)
-            if claimed:
-                _release_claim(admin, user_id, claim_prev)
+            _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
             return jsonify({"code": "CONVERSION_FAILED",
                             "error": "Please upload a valid PDF file."}), 400
         try:
@@ -528,14 +569,12 @@ def convert():
                 input_path, PRO_MAX_PAGES if pro else FREE_MAX_PAGES)
         except Exception:
             cleanup_files(input_path)
-            if claimed:
-                _release_claim(admin, user_id, claim_prev)
+            _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
             return jsonify({"code": "CONVERSION_FAILED",
                             "error": "We couldn't read this PDF. Please try another file."}), 400
         if reject_code:
             cleanup_files(input_path)
-            if claimed:
-                _release_claim(admin, user_id, claim_prev)
+            _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
             if reject_code == "PASSWORD_REQUIRED":
                 payload = {"code": "PASSWORD_REQUIRED",
                            "error": ("This PDF is password-protected. Remove the "
@@ -555,7 +594,7 @@ def convert():
 
         run_conversion(input_path, output_path)
 
-        # 6. SUCCESS — the Free claim stands (timestamp already set by the
+        # 6. SUCCESS — the Free claim / Pro fair-use slot stands (set by the
         #    atomic RPC). Stream the file, then clean up.
         response = send_file(
             output_path,
@@ -567,13 +606,24 @@ def convert():
         return response
 
     except Exception:
-        # 7. FAILURE — release the Free claim so the user keeps their quota.
+        # 7. FAILURE — release the claim so the user keeps their quota.
         logger.exception("Conversion failed")
         cleanup_files(input_path, output_path)
-        if claimed:
-            _release_claim(admin, user_id, claim_prev)
+        _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
         return jsonify({"code": "CONVERSION_FAILED",
                         "error": "We couldn't convert this file. Please try again."}), 500
+
+
+def _release_all(admin, user_id, claimed, previous, pro_claim_id):
+    """A conversion failed: give back the Free claim and/or the Pro fair-use slot."""
+    if claimed:
+        _release_claim(admin, user_id, previous)
+    if pro_claim_id is not None:
+        try:
+            admin.rpc("release_pro_conversion",
+                      {"p_user_id": user_id, "p_claim_id": pro_claim_id}).execute()
+        except Exception:
+            logger.exception("Failed to release the Pro fair-use slot")
 
 
 def _release_claim(admin, user_id, previous):
