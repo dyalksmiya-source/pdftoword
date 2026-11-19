@@ -17,6 +17,9 @@
  *
  * API for script.js and billing.js: window.pwPlan.refresh(), .update(me),
  * .state, .me, .onChange(fn).
+ *
+ * Also shows "Your account has been deleted." when the page is opened with
+ * ?account=deleted (account.js redirects there after a deletion).
  */
 (function () {
   'use strict';
@@ -178,7 +181,44 @@
     return plan;
   }
 
-  var api = { create: create, render: render, badgeText: badgeText, readCache: readCache, CACHE_KEY: CACHE_KEY };
+  /** One-time notice after an account deletion (?account=deleted). */
+  function showAccountNotice(doc, win) {
+    var params;
+    try {
+      params = new URLSearchParams(win.location.search || '');
+    } catch (e) {
+      return false;
+    }
+    if (params.get('account') !== 'deleted') return false;
+    var t = typeof win.pwT === 'function' ? win.pwT : function (k) { return k; };
+    var box = doc.createElement('div');
+    box.className = 'site-notice';
+    box.setAttribute('role', 'status');
+    var text = doc.createElement('p');
+    text.textContent = t('Your account has been deleted.');
+    var close = doc.createElement('button');
+    close.type = 'button';
+    close.className = 'site-notice-close';
+    close.setAttribute('aria-label', t('Close'));
+    close.textContent = '×';
+    close.addEventListener('click', function () {
+      if (box.parentNode) box.parentNode.removeChild(box);
+    });
+    box.appendChild(text);
+    box.appendChild(close);
+    var main = doc.getElementById('main');
+    if (main && main.parentNode) main.parentNode.insertBefore(box, main);
+    else if (doc.body) doc.body.insertBefore(box, doc.body.firstChild);
+    try {
+      params.delete('account');
+      var q = params.toString();
+      win.history.replaceState(null, '', win.location.pathname + (q ? '?' + q : '') + (win.location.hash || ''));
+    } catch (e) { /* old browser: the notice simply shows again on reload */ }
+    return true;
+  }
+
+  var api = { create: create, render: render, badgeText: badgeText, readCache: readCache, CACHE_KEY: CACHE_KEY,
+    showAccountNotice: showAccountNotice };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api; // local tests only
   } else {
@@ -186,7 +226,10 @@
     window.pwPlan = plan;
     // script.js (loaded right after this file) starts the first refresh;
     // this is only a safety net for a page without it.
-    var start = function () { if (!plan.started) plan.refresh(); };
+    var start = function () {
+      if (!plan.started) plan.refresh();
+      showAccountNotice(document, window);
+    };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
     else start();
   }

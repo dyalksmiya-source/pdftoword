@@ -142,6 +142,22 @@ def is_pro(profile, now=None):
     return False
 
 
+def blocks_account_deletion(profile):
+    """True if a Paddle subscription would keep renewing after deletion.
+
+    Blocked: a Paddle subscription that is active / trialing / past_due and
+    NOT scheduled to cancel. Allowed: canceled, paused, scheduled to cancel,
+    or no Paddle subscription. The user cancels in Paddle's portal first
+    (the server's API key stays read-only for subscriptions).
+    """
+    if not profile or not profile.get("paddle_subscription_id"):
+        return False
+    status = str(profile.get("subscription_status") or "").lower()
+    if status not in ALWAYS_PRO_STATUSES:
+        return False
+    return not profile.get("cancel_at")
+
+
 def billing_summary(profile, now=None):
     """Extra /api/me fields: renewal or end date, and a scheduled cancellation."""
     profile = profile or {}

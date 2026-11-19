@@ -143,11 +143,35 @@
           <p>Cancelling stops the next renewal. Pro stays active until the end of the period you already paid for, then your account returns to the Free plan. Your account and its data are kept until you delete your account. You can get a full refund within <span data-config="refund-days">14</span> days of any payment: see the <a href="refund-policy.html">Refund Policy</a>.</p>
         </section>
 
-        <section class="account-card account-danger" aria-labelledby="delete-title">
+        <section class="account-card account-danger" id="delete" aria-labelledby="delete-title">
           <h2 id="delete-title">Delete account</h2>
-          <p>Deleting your account permanently removes your account and its data. This option is coming soon; until then, email <a data-config="support-email" href="mailto:support@pdf2wordly.com">support@pdf2wordly.com</a> from the address of your account.</p>
-          <button type="button" class="btn btn-secondary is-disabled" disabled aria-disabled="true">Coming soon</button>
+          <p>Deleting your account permanently removes your sign-in, your email address, your plan and your usage information. It cannot be undone. See <a href="delete-account.html">what is deleted and what is kept</a>.</p>
+          <p>If your Pro subscription still renews, cancel it first with <strong>Manage subscription</strong>.</p>
+          <button type="button" class="btn btn-danger" id="deleteAccountBtn">Delete account</button>
+          <p class="account-error" id="deleteError" role="alert" hidden></p>
         </section>
+
+        <dialog class="confirm-dialog" id="deleteDialog" aria-labelledby="deleteDialogTitle" aria-describedby="deleteDialogText">
+          <form method="dialog" id="deleteForm" novalidate>
+            <h2 id="deleteDialogTitle">Delete your account?</h2>
+            <div id="deleteDialogText">
+              <p>This permanently deletes:</p>
+              <ul class="legal-list">
+                <li>your sign-in and email address,</li>
+                <li>your plan and usage information,</li>
+                <li>the link to your Paddle subscription.</li>
+              </ul>
+              <p>If your Pro subscription is set to end later, the remaining Pro time is lost. Payment records stay with Paddle, our payment provider.</p>
+            </div>
+            <label class="confirm-label" for="deleteConfirmInput">Type <strong>DELETE</strong> to confirm</label>
+            <input class="confirm-input" type="text" id="deleteConfirmInput" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <p class="account-error" id="deleteDialogError" role="alert" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" class="btn btn-secondary" id="deleteCancel">Cancel</button>
+              <button type="submit" class="btn btn-danger" id="deleteConfirm" disabled>Delete my account</button>
+            </div>
+          </form>
+        </dialog>
 
       </div>
     </div>
@@ -203,7 +227,7 @@
 
   </div>
   <div class="footer-bottom">
-    <nav class="footer-legal" aria-label="Legal"><a href="index.html#pricing">Pricing</a><a href="terms.html">Terms</a><a href="refund-policy.html">Refund Policy</a><a href="privacy.html">Privacy</a><a href="contact.html">Contact</a></nav>
+    <nav class="footer-legal" aria-label="Legal"><a href="index.html#pricing">Pricing</a><a href="terms.html">Terms</a><a href="refund-policy.html">Refund Policy</a><a href="privacy.html">Privacy</a><a href="delete-account.html">Delete account</a><a href="contact.html">Contact</a></nav>
     <p>&copy; <span id="year"></span> PDF2Wordly, operated by <span data-config="legal-name">Marouane El Habhabi</span> (<span data-config="legal-form">sole proprietor</span>). All rights reserved.</p>
   </div>
 </footer>

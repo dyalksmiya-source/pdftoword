@@ -70,6 +70,12 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   renews_at, ends_at, cancel_scheduled, billing_source }`.
 - `POST /api/paddle/webhook` — Paddle only; `Paddle-Signature` verified on the
   raw body (5-minute window), idempotent via `public.paddle_events`.
+- `DELETE /api/account` — same auth; JSON `{"confirm": "DELETE"}`. Deletes the
+  profile row, then the Supabase auth user. `409 SUBSCRIPTION_ACTIVE` while a
+  Paddle subscription still renews (active / trialing / past_due without a
+  scheduled cancel); `400 CONFIRMATION_REQUIRED`; `429 RATE_LIMITED` (5 per
+  user per 15 min, 20 per IP per hour, in memory per worker). Public help page:
+  `delete-account.html` (en, fr, ar), the URL for Google Play.
 - `POST /api/billing/portal` — same auth; returns Paddle customer portal links
   `{ overview_url, cancel_url, update_payment_url }` (503 without `PADDLE_API_KEY`).
 - `POST /api/convert` — same auth; multipart field `file`. Machine-readable
@@ -88,7 +94,7 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   `canceled` before `current_period_end` (`billing.is_pro`; the same rule is in
   `claim_free_conversion`). Evaluated only from the database.
 - Tests: `python -m unittest discover -s _tests`, `node _tests/billing_js_test.js`
-  and `node _tests/plan_ui_test.js`.
+  `node _tests/plan_ui_test.js` and `node _tests/account_delete_test.js`.
 - Plan display: `plan-ui.js` is the only browser code that asks `/api/me`; it sets
   `<html data-plan-state>` (loading / signed-out / free / pro) and `style.css` shows
   "Get Pro" or the "Pro" badge. Pro users never see a purchase button.

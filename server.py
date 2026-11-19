@@ -22,6 +22,8 @@ Endpoints:
   GET  /api/me       -> { plan, subscription_status, ... } for the caller (auth)
   POST /api/convert  -> multipart/form-data, field "file" (auth + limit)
   POST /api/paddle/webhook, POST /api/billing/portal -> see billing.py
+  DELETE /api/account -> JSON {"confirm": "DELETE"} (auth + rate limit):
+                       deletes the profile row, then the Supabase auth user
 
 Run:
   python3 server.py
@@ -30,8 +32,10 @@ Run:
 import logging
 import os
 import tempfile
+import threading
 import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -94,7 +98,7 @@ CORS(
     origins=ALLOWED_ORIGINS,
     supports_credentials=False,
     allow_headers=["Content-Type", "Authorization"],
-    methods=["GET", "POST", "OPTIONS"],
+    methods=["GET", "POST", "DELETE", "OPTIONS"],
 )
 
 
@@ -304,6 +308,108 @@ def me():
         "current_period_end": profile.get("current_period_end"),
         **billing.billing_summary(profile),
     })
+
+
+# ---------------------------------------------------------------------------
+# Account deletion
+# ---------------------------------------------------------------------------
+
+class RateLimiter:
+    """Sliding-window limit per key, in memory (per gunicorn worker)."""
+
+    def __init__(self, limit, window_seconds):
+        self.limit = limit
+        self.window = window_seconds
+        self._hits = {}
+        self._lock = threading.Lock()
+
+    def hit(self, key, now=None):
+        """Count one attempt. Returns 0 if allowed, else seconds to wait."""
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            q = self._hits.setdefault(key, deque())
+            while q and q[0] <= now - self.window:
+                q.popleft()
+            if len(q) >= self.limit:
+                return max(1, int(q[0] + self.window - now) + 1)
+            q.append(now)
+            if len(self._hits) > 10000:  # keep memory bounded
+                for k in [k for k, v in self._hits.items() if not v]:
+                    del self._hits[k]
+            return 0
+
+
+DELETE_USER_LIMITER = RateLimiter(limit=5, window_seconds=15 * 60)
+DELETE_IP_LIMITER = RateLimiter(limit=20, window_seconds=60 * 60)
+
+
+def _client_ip():
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    return (forwarded.split(",")[0].strip() if forwarded else "") or (request.remote_addr or "?")
+
+
+def _rate_limited(wait):
+    resp = jsonify({"code": "RATE_LIMITED",
+                    "error": "Too many attempts. Please try again later.",
+                    "retry_after_seconds": wait})
+    resp.headers["Retry-After"] = str(wait)
+    return resp, 429
+
+
+@app.route("/api/account", methods=["DELETE"])
+def delete_account():
+    """Delete the caller's account: profile row first, then the auth user.
+
+    Order: if deleting the auth user fails after the profile is gone, the
+    user can sign in and simply retry (a missing profile is allowed here).
+    paddle_events rows stay; their user_id becomes NULL through the FK.
+    Logs never contain the user id or the email.
+    """
+    wait = DELETE_IP_LIMITER.hit(_client_ip())
+    if wait:
+        logger.warning("Account deletion: RATE_LIMITED")
+        return _rate_limited(wait)
+
+    user_id, err = get_authenticated_user_id()
+    if err:
+        return err
+
+    wait = DELETE_USER_LIMITER.hit(user_id)
+    if wait:
+        logger.warning("Account deletion: RATE_LIMITED")
+        return _rate_limited(wait)
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or body.get("confirm") != "DELETE":
+        logger.info("Account deletion: CONFIRMATION_REQUIRED")
+        return jsonify({"code": "CONFIRMATION_REQUIRED",
+                        "error": 'Type DELETE to confirm.'}), 400
+
+    try:
+        admin = _supabase_admin()
+        profile = get_profile(admin, user_id)
+    except Exception as exc:
+        logger.error("Account deletion: SERVER_ERROR (%s)", type(exc).__name__)
+        return jsonify({"code": "SERVER_ERROR",
+                        "error": "Something went wrong. Please try again later."}), 500
+
+    if billing.blocks_account_deletion(profile):
+        logger.info("Account deletion: SUBSCRIPTION_ACTIVE")
+        return jsonify({"code": "SUBSCRIPTION_ACTIVE",
+                        "error": ("You have a Pro subscription that will renew. Cancel it "
+                                  "first in Manage subscription, then delete your account.")}), 409
+
+    try:
+        if profile is not None:
+            admin.table("profiles").delete().eq("id", user_id).execute()
+        admin.auth.admin.delete_user(user_id)
+    except Exception as exc:
+        logger.error("Account deletion: SERVER_ERROR (%s)", type(exc).__name__)
+        return jsonify({"code": "SERVER_ERROR",
+                        "error": "Something went wrong. Please try again later."}), 500
+
+    logger.info("Account deleted")
+    return jsonify({"deleted": True}), 200
 
 
 @app.route("/api/convert", methods=["POST"])

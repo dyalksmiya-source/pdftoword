@@ -190,9 +190,9 @@ const state = doc => doc.documentElement.getAttribute('data-plan-state');
 
   // ---- every header page has the markup, in the right order
   const pages = fs.readdirSync(SITE).filter(f => f.endsWith('.html')).map(f => f)
-    .concat(['fr/index.html', 'ar/index.html'])
+    .concat(['fr/index.html', 'ar/index.html', 'fr/delete-account.html', 'ar/delete-account.html'])
     .filter(f => fs.readFileSync(path.join(SITE, f), 'utf8').includes('header-get-pro'));
-  ok(pages.length === 20, 'pages with a header: 20');
+  ok(pages.length === 23, 'pages with a header: 23');
   for (const pg of pages) {
     const s = fs.readFileSync(path.join(SITE, pg), 'utf8');
     const sub = pg.includes('/');

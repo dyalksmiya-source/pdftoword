@@ -9,13 +9,28 @@
  *   customer portal link and open it. When a cancellation is already
  *   scheduled, only "Manage subscription" stays (Paddle's portal lets the
  *   user resume) and a short note says the subscription will not renew.
- * - "Delete account" stays disabled until the server endpoint exists.
+ * - "Delete account" opens a dialog; the user types DELETE, then
+ *   DELETE /api/account. On success: local sign-out and redirect to the home
+ *   page with ?account=deleted (plan-ui.js shows the notice). On 409
+ *   (renewing subscription): the cancel-first message with a link that opens
+ *   "Manage subscription".
  */
 (function () {
   'use strict';
 
   var ERROR_TEXT = "We couldn't load your plan. Please try again later.";
   var PORTAL_ERROR_TEXT = "We couldn't open the subscription page. Please try again later.";
+  var DELETE_TEXT = {
+    blocked: 'You have a Pro subscription that will renew. Cancel it first in ',
+    manage: 'Manage subscription',
+    blockedEnd: ', then delete your account.',
+    expired: 'Your session has expired. Please log in again, then try again.',
+    limited: 'Too many attempts. Please try again later.',
+    failed: "We couldn't delete your account. Please try again later.",
+    working: 'Deleting…',
+    confirm: 'Delete my account',
+  };
+  var SUPABASE_STORAGE_KEY = 'sb-yjxfxdbrjsiuevnkiiak-auth-token';
   var WILL_NOT_RENEW_TEXT = 'Your subscription will not renew. You can resume it from Manage subscription.';
 
   /** Site i18n (pwT from script.js); English when it is not there. */
@@ -124,6 +139,119 @@
     return true;
   }
 
+  /** Remove the local session after the account is gone (no server call). */
+  async function signOutLocal(client, win) {
+    try {
+      if (client && client.auth && client.auth.signOut) await client.auth.signOut({ scope: 'local' });
+    } catch (e) { /* the user no longer exists: ignore */ }
+    try { win.localStorage.removeItem(SUPABASE_STORAGE_KEY); } catch (e) { /* storage blocked */ }
+    try { win.sessionStorage.removeItem('pw-plan'); } catch (e) { /* storage blocked */ }
+  }
+
+  /**
+   * Delete-account button + confirmation dialog.
+   * getToken() -> current access token. Returns the handlers for tests.
+   */
+  function setupDelete(doc, win, client, api, getToken, fetchImpl, state) {
+    state = state || {};
+    var openBtn = doc.getElementById('deleteAccountBtn');
+    var dialog = doc.getElementById('deleteDialog');
+    var form = doc.getElementById('deleteForm');
+    var input = doc.getElementById('deleteConfirmInput');
+    var confirmBtn = doc.getElementById('deleteConfirm');
+    var cancelBtn = doc.getElementById('deleteCancel');
+    var dialogErr = doc.getElementById('deleteDialogError');
+    var pageErr = doc.getElementById('deleteError');
+    if (!openBtn || !dialog || !form || !input || !confirmBtn) return null;
+
+    function showError(el, text) {
+      if (!el) return;
+      el.textContent = text;
+      el.hidden = false;
+    }
+    function closeDialog() {
+      if (typeof dialog.close === 'function') dialog.close();
+      else dialog.removeAttribute('open');
+    }
+    function open() {
+      input.value = '';
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = DELETE_TEXT.confirm;
+      if (dialogErr) dialogErr.hidden = true;
+      if (pageErr) pageErr.hidden = true;
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
+      if (input.focus) input.focus();
+    }
+    function onInput() {
+      confirmBtn.disabled = input.value !== 'DELETE';
+    }
+    function showBlocked() {
+      closeDialog();
+      if (!pageErr) return;
+      pageErr.textContent = '';
+      pageErr.appendChild(doc.createTextNode(DELETE_TEXT.blocked));
+      var link = doc.createElement('a');
+      link.href = '#billingActions';
+      link.textContent = DELETE_TEXT.manage;
+      link.addEventListener('click', function (ev) {
+        var manage = doc.getElementById('manageSubscription');
+        if (manage && manage.click) {
+          if (ev && ev.preventDefault) ev.preventDefault();
+          manage.click();
+        }
+      });
+      pageErr.appendChild(link);
+      pageErr.appendChild(doc.createTextNode(DELETE_TEXT.blockedEnd));
+      pageErr.hidden = false;
+    }
+    async function submit(ev) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (input.value !== 'DELETE' || state.deleting) return 'not-confirmed';
+      state.deleting = true;
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = DELETE_TEXT.working;
+      if (dialogErr) dialogErr.hidden = true;
+      var result;
+      try {
+        var token = await getToken();
+        if (!token) {
+          showError(dialogErr, DELETE_TEXT.expired);
+          result = 'expired';
+        } else {
+          var r = await fetchImpl(api + '/api/account', {
+            method: 'DELETE',
+            headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: 'DELETE' }),
+          });
+          if (r.ok) {
+            state.deleted = true;
+            await signOutLocal(client, win);
+            win.location.replace('index.html?account=deleted');
+            return 'deleted';
+          }
+          if (r.status === 409) { showBlocked(); result = 'blocked'; }
+          else if (r.status === 401) { showError(dialogErr, DELETE_TEXT.expired); result = 'expired'; }
+          else if (r.status === 429) { showError(dialogErr, DELETE_TEXT.limited); result = 'limited'; }
+          else { showError(dialogErr, DELETE_TEXT.failed); result = 'failed'; }
+        }
+      } catch (e) {
+        showError(dialogErr, DELETE_TEXT.failed);
+        result = 'failed';
+      }
+      state.deleting = false;
+      confirmBtn.textContent = DELETE_TEXT.confirm;
+      onInput();
+      return result;
+    }
+
+    openBtn.addEventListener('click', open);
+    input.addEventListener('input', onInput);
+    form.addEventListener('submit', submit);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeDialog);
+    return { open: open, submit: submit, onInput: onInput };
+  }
+
   async function init(doc, win, client, fetchImpl) {
     var loginUrl = 'login.html';
     if (!client) {
@@ -142,16 +270,27 @@
       return 'redirect';
     }
 
-    // Signing out on this page sends the user to the login page.
+    // Signing out on this page sends the user to the login page
+    // (not after a deletion: that one goes to the home page).
+    var deleteState = {};
     if (client.auth.onAuthStateChange) {
       client.auth.onAuthStateChange(function (_event, s) {
-        if (!s) win.location.replace(loginUrl);
+        if (!s && !deleteState.deleted) win.location.replace(loginUrl);
       });
     }
 
     setText(doc, 'accountEmail', session.user.email || '');
+    var api = backendUrl(doc, win);
+    setupDelete(doc, win, client, api, async function () {
+      try {
+        var res2 = await client.auth.getSession();
+        var s2 = res2 && res2.data && res2.data.session;
+        return s2 && s2.access_token;
+      } catch (e) {
+        return null;
+      }
+    }, fetchImpl, deleteState);
     try {
-      var api = backendUrl(doc, win);
       var r = await fetchImpl(api + '/api/me', {
         method: 'GET',
         headers: { Authorization: 'Bearer ' + session.access_token },
@@ -176,7 +315,7 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { init: init, describe: describe, backendUrl: backendUrl, setupBilling: setupBilling }; // local tests only
+    module.exports = { init: init, describe: describe, backendUrl: backendUrl, setupBilling: setupBilling, setupDelete: setupDelete }; // local tests only
   } else {
     var start = function () {
       init(document, window, window.__supabaseClient, window.fetch.bind(window));
