@@ -162,7 +162,7 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   ok(await B.init(doc, w, signedIn, async () => ({})) === 'error' && doc.getElementById('proCta').tagName === 'SPAN', 'Paddle.js fails: button stays "coming soon"');
 
   // ---- signed out: remember #pricing and go to login
-  for (const [p, login, back] of [['/', 'login.html', '/#pricing'], ['/fr/', '../login.html', '/fr/#pricing'], ['/ar/', '../login.html', '/ar/#pricing']]) {
+  for (const [p, login, back] of [['/', 'login.html', '/#pricing'], ['/fr/', 'login.html', '/fr/#pricing'], ['/ar/', 'login.html', '/ar/#pricing']]) {
     const st = storageMock({ 'pw-paddle': 'sandbox' });
     const pm = paddleMock();
     doc = homePage(); w = windowMock({ path: p, store: st, paddle: pm });

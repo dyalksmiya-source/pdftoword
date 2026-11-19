@@ -117,9 +117,9 @@
     return '/#pricing';
   }
 
+  /** The login page in the same language (fr/login.html, ar/login.html, login.html). */
   function loginUrl(win) {
-    var p = String(win.location.pathname || '/');
-    return p.indexOf('/fr/') === 0 || p.indexOf('/ar/') === 0 ? '../login.html' : 'login.html';
+    return 'login.html';
   }
 
   function rememberReturn(win, now) {

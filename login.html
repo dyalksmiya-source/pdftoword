@@ -119,6 +119,32 @@
     transition: background 150ms var(--ease), border-color 150ms var(--ease);
   }
   .btn-google:hover { background: var(--surface-sunken); border-color: var(--text-muted); }
+  /* Google first and most visible */
+  .btn-google { padding: 13px 16px; font-size: 15.5px; border-width: 1.5px; box-shadow: var(--shadow-sm); }
+  .btn-google:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  /* Inline messages shown on the page */
+  .auth-message { margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-sm); font-size: 13.5px; line-height: 1.5; text-align: start; border: 1px solid var(--border); background: var(--surface-sunken); color: var(--text); }
+  .auth-message[hidden] { display: none; }
+  .auth-message[data-kind="error"] { background: var(--danger-tint); border-color: var(--danger); color: var(--danger); }
+  .auth-message[data-kind="success"] { background: var(--success-tint); border-color: var(--success); color: var(--text); }
+  .auth-message[data-kind="info"] { background: var(--primary-tint); border-color: var(--primary); color: var(--text); }
+  .auth-form > .auth-message { margin: 0; }
+
+  /* Code step */
+  .code-input { width: 100%; text-align: center; font-family: var(--font-mono); font-size: 26px; letter-spacing: .5em; padding: 12px 8px 12px calc(8px + .5em); }
+  .code-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 4px; }
+  .link-button { background: none; border: none; padding: 6px 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--primary); cursor: pointer; }
+  .link-button:disabled { color: var(--text-muted); cursor: default; }
+  .link-button:not(:disabled):hover { text-decoration: underline; }
+  .auth-captcha { display: flex; justify-content: center; min-height: 0; }
+  .auth-captcha[hidden] { display: none; }
+  .auth-tabs[hidden] { display: none; }
+
+  /* Right-to-left (Arabic) */
+  [dir="rtl"] .auth-tab-indicator { left: auto; right: 4px; }
+  [dir="rtl"] .auth-tabs[data-active="signup"] .auth-tab-indicator { transform: translateX(-100%); }
+  @media (max-width: 420px) { .code-input { font-size: 22px; letter-spacing: .35em; } }
 
   /* Divider */
   .auth-divider {
@@ -278,8 +304,8 @@
         <button type="button" class="lang-switch-btn" aria-expanded="false" aria-controls="langSwitchMenu" aria-label="Language: English"><svg class="lang-switch-globe" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg><span class="lang-code" aria-hidden="true">EN</span><svg class="lang-switch-caret" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg></button>
         <ul class="lang-switch-menu" id="langSwitchMenu" hidden>
           <li><a href="/login.html" lang="en" hreflang="en" aria-current="true"><span>English</span><svg class="lang-switch-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg></a></li>
-          <li><a href="/fr/" lang="fr" hreflang="fr"><span>Français</span><svg class="lang-switch-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg></a></li>
-          <li><a href="/ar/" lang="ar" hreflang="ar" dir="rtl"><span>العربية</span><svg class="lang-switch-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg></a></li>
+          <li><a href="/fr/login.html" lang="fr" hreflang="fr"><span>Français</span><svg class="lang-switch-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg></a></li>
+          <li><a href="/ar/login.html" lang="ar" hreflang="ar" dir="rtl"><span>العربية</span><svg class="lang-switch-check" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg></a></li>
         </ul>
       </div>
       <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark theme" aria-pressed="false">
@@ -331,17 +357,7 @@
   <h1>Welcome back</h1>
   <p>Log in to keep converting your PDFs.</p>
 
-  <div id="loginMessage" style="
-    display: none;
-    margin-top: 12px;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    line-height: 1.5;
-    background: #fff4e5;
-    border: 1px solid #f0b35b;
-    color: #8a5200;
-  "></div>
+  <div class="auth-message" id="loginMessage" role="alert" hidden></div>
 </div>
 
         <button type="button" class="btn-google">
@@ -383,7 +399,8 @@
            <a href="forgot-password.html" class="link-inline">Forgot password?</a>
           </div>
 
-          <button type="submit" class="btn btn-primary btn-large btn-full">Log in</button>
+          <div class="auth-captcha" data-captcha="login" hidden></div>
+          <button type="submit" class="btn btn-primary btn-large btn-full" id="loginSubmit">Log in</button>
         </form>
       </div>
 
@@ -393,6 +410,7 @@
         <div class="auth-heading">
           <h1>Create your account</h1>
           <p>It's free — start converting PDFs in seconds.</p>
+          <div class="auth-message" id="signupMessage" role="alert" hidden></div>
         </div>
 
         <button type="button" class="btn-google">
@@ -402,7 +420,7 @@
             <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"/>
             <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"/>
           </svg>
-          Sign up with Google
+          Continue with Google
         </button>
 
         <div class="auth-divider"><span>or</span></div>
@@ -434,11 +452,35 @@
           </div>
 
           <label class="checkbox-row">
-            <input type="checkbox" name="agree" required>
-            <span>I agree to the Terms and <a href="privacy.html" class="link-inline">Privacy Policy</a>.</span>
+            <input type="checkbox" name="agree" id="signupAgree" required>
+            <span>I agree to the <a href="terms.html" class="link-inline">Terms</a> and <a href="privacy.html" class="link-inline">Privacy Policy</a>.</span>
           </label>
 
-          <button type="submit" class="btn btn-primary btn-large btn-full">Create account</button>
+          <div class="auth-captcha" data-captcha="signup" hidden></div>
+          <button type="submit" class="btn btn-primary btn-large btn-full" id="signupSubmit">Create account</button>
+        </form>
+      </div>
+
+      <!-- CODE PANEL: "Confirm signup" email code -->
+      <div class="auth-panel" id="panelCode" hidden>
+
+        <div class="auth-heading">
+          <h1>Check your email</h1>
+          <p>We sent a 6-digit code to <strong id="codeEmail" dir="ltr"></strong>. Enter it below. The code is valid for 15 minutes.</p>
+        </div>
+
+        <form class="auth-form" id="codeForm" novalidate>
+          <div class="field">
+            <label for="codeInput">6-digit code</label>
+            <input type="text" id="codeInput" class="code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" dir="ltr" placeholder="••••••" aria-describedby="codeMessage">
+          </div>
+          <div class="auth-message" id="codeMessage" role="alert" hidden></div>
+          <button type="submit" class="btn btn-primary btn-large btn-full" id="verifyCode">Verify</button>
+          <div class="auth-captcha" data-captcha="code" hidden></div>
+          <div class="code-actions">
+            <button type="button" class="link-button" id="resendCode">Resend code</button>
+            <button type="button" class="link-button" id="changeEmail">Use a different email</button>
+          </div>
         </form>
       </div>
 
@@ -461,232 +503,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-  // ---- Supabase client setup ----
-  // Renamed to `supabaseClient` (not `supabase`) to avoid clashing with the
-  // `supabase` global that the CDN script above already attaches to window.
-  const SUPABASE_URL = "https://yjxfxdbrjsiuevnkiiak.supabase.co";
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqeGZ4ZGJyanNpdWV2bmtpaWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDMyNzUsImV4cCI6MjEwMzA3OTI3NX0.K83ZZJhw8kuCeHRfgN6wO30K9SHW_pyhQxaZufWE0jo";
-
-  // Where users land right after a successful login — the live production
-  // domain, not a relative path, per your request.
-  const POST_LOGIN_URL = "https://pdf2wordly.com/";
-
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  async function signInWithGoogle() {
-    const { error } = await supabaseClient.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: POST_LOGIN_URL
-      }
-    });
-    if (error) {
-      alert(error.message);
-    }
-  }
-
-  document.querySelectorAll('.btn-google').forEach(btn => {
-    btn.addEventListener('click', signInWithGoogle);
-  });
-
-  // Theme toggle (matches main site behavior)
-  const themeToggle = document.getElementById('themeToggle');
-  const root = document.documentElement;
-  const savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'dark') {
-    root.setAttribute('data-theme', 'dark');
-    themeToggle?.setAttribute('aria-pressed', 'true');
-  }
-  themeToggle?.addEventListener('click', () => {
-    const isDark = root.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-      root.removeAttribute('data-theme');
-      localStorage.setItem('theme', 'light');
-      themeToggle.setAttribute('aria-pressed', 'false');
-    } else {
-      root.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
-      themeToggle.setAttribute('aria-pressed', 'true');
-    }
-  });
-
-  // Mobile menu
-  const mobileToggle = document.getElementById('mobileMenuToggle');
-  const mobileMenu = document.getElementById('mobileMenu');
-  mobileToggle?.addEventListener('click', () => {
-    const expanded = mobileToggle.getAttribute('aria-expanded') === 'true';
-    mobileToggle.setAttribute('aria-expanded', String(!expanded));
-    mobileMenu.hidden = expanded;
-  });
-
-  // ---- Tabs: Log in / Sign up ----
-  const authTabs = document.getElementById('authTabs');
-  const tabLogin = document.getElementById('tabLogin');
-  const tabSignup = document.getElementById('tabSignup');
-  const panelLogin = document.getElementById('panelLogin');
-  const panelSignup = document.getElementById('panelSignup');
-  const authSwitch = document.getElementById('authSwitch');
-  const switchToSignup = document.getElementById('switchToSignup');
-
-  function setActiveTab(target) {
-    const isLogin = target === 'login';
-
-    authTabs.dataset.active = target;
-    tabLogin.setAttribute('aria-selected', String(isLogin));
-    tabSignup.setAttribute('aria-selected', String(!isLogin));
-
-    panelLogin.hidden = !isLogin;
-    panelSignup.hidden = isLogin;
-    panelLogin.classList.toggle('is-active', isLogin);
-    panelSignup.classList.toggle('is-active', !isLogin);
-
-    authSwitch.innerHTML = isLogin
-      ? `Don't have an account? <button type="button" id="switchToSignup">Sign up</button>`
-      : `Already have an account? <button type="button" id="switchToLogin">Log in</button>`;
-
-    // Re-bind the switch button since we replaced innerHTML
-    document.getElementById('switchToSignup')?.addEventListener('click', () => setActiveTab('signup'));
-    document.getElementById('switchToLogin')?.addEventListener('click', () => setActiveTab('login'));
-  }
-
-  tabLogin.addEventListener('click', () => setActiveTab('login'));
-  tabSignup.addEventListener('click', () => setActiveTab('signup'));
-  switchToSignup.addEventListener('click', () => setActiveTab('signup'));
-
-  // ---- Password show/hide ----
-  document.querySelectorAll('.password-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const input = document.getElementById(btn.dataset.target);
-      const isVisible = btn.getAttribute('data-visible') === 'true';
-      input.type = isVisible ? 'password' : 'text';
-      btn.setAttribute('data-visible', String(!isVisible));
-      btn.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
-    });
-  });
-
-  // ---- Basic client-side validation ----
-  function validateField(fieldEl, isValid) {
-    fieldEl.classList.toggle('has-error', !isValid);
-  }
-
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('loginEmail');
-    const password = document.getElementById('loginPassword');
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value);
-    const passwordValid = password.value.length > 0;
-
-    validateField(document.getElementById('loginEmailField'), emailValid);
-    validateField(document.getElementById('loginPasswordField'), passwordValid);
-
-    if (emailValid && passwordValid) {
-      const { error } = await supabaseClient.auth.signInWithPassword({
-        email: email.value,
-        password: password.value
-      });
-      if (error) {
-        alert(error.message);
-      } else {
-        window.location.href = POST_LOGIN_URL;
-      }
-    }
-  });
-
- document.getElementById('signupForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const name = document.getElementById('signupName');
-  const email = document.getElementById('signupEmail');
-  const password = document.getElementById('signupPassword');
-
-  const emailValue = email.value.trim().toLowerCase();
-
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue);
-  const passwordValid = password.value.length >= 8;
-  const nameValid = name.value.trim().length > 0;
-
-  validateField(
-    document.getElementById('signupNameField'),
-    nameValid
+  // Supabase client (public anon key). Sign-in behaviour lives in auth.js.
+  window.__supabaseClient = window.supabase.createClient(
+    "https://yjxfxdbrjsiuevnkiiak.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqeGZ4ZGJyanNpdWV2bmtpaWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDMyNzUsImV4cCI6MjEwMzA3OTI3NX0.K83ZZJhw8kuCeHRfgN6wO30K9SHW_pyhQxaZufWE0jo"
   );
-
-  validateField(
-    document.getElementById('signupEmailField'),
-    emailValid
-  );
-
-  validateField(
-    document.getElementById('signupPasswordField'),
-    passwordValid
-  );
-
-  if (!nameValid || !emailValid || !passwordValid) {
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signUp({
-    email: emailValue,
-    password: password.value,
-    options: {
-      data: {
-        full_name: name.value.trim()
-      }
-    }
-  });
-
-  // Email already registered
-  if (error) {
-
-    const errorMessage = error.message.toLowerCase();
-
-    if (
-      errorMessage.includes("already registered") ||
-      errorMessage.includes("already exists") ||
-      errorMessage.includes("already been registered")
-    ) {
-
-      // Switch automatically to Login
-      setActiveTab('login');
-
-      // Put the same email automatically in Login
-      document.getElementById('loginEmail').value = emailValue;
-
-      // Clear Login password
-      document.getElementById('loginPassword').value = '';
-
-      // Show clear message
-      const loginMessage = document.getElementById('loginMessage');
-
-      loginMessage.innerHTML = `
-        <strong>This email already has an account.</strong><br>
-        Please enter your password below to log in.
-      `;
-
-      loginMessage.style.display = 'block';
-
-      // Focus password directly
-      setTimeout(() => {
-        document.getElementById('loginPassword').focus();
-      }, 300);
-
-      return;
-    }
-
-    // Other errors
-    alert(error.message);
-    return;
-  }
-
-  // Successful signup + automatic login
-  if (data.session) {
-    window.location.href = POST_LOGIN_URL;
-  } else {
-    alert(
-      "Account created successfully. Please check your email to confirm your account."
-    );
-  }
-});
 </script>
+<script src="auth.js" defer></script>
 
 <script src="header-menus.js" defer></script>
 </body>

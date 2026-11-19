@@ -94,7 +94,14 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   `canceled` before `current_period_end` (`billing.is_pro`; the same rule is in
   `claim_free_conversion`). Evaluated only from the database.
 - Tests: `python -m unittest discover -s _tests`, `node _tests/billing_js_test.js`
-  `node _tests/plan_ui_test.js` and `node _tests/account_delete_test.js`.
+  `node _tests/plan_ui_test.js`, `node _tests/account_delete_test.js` and
+  `node _tests/auth_test.js`.
+- Sign-in (`auth.js`, used by `login.html`, `fr/login.html`, `ar/login.html` and
+  `forgot-password.html`): Google first (`prompt=select_account`); email sign up
+  confirmed with the 6-digit code of the "Confirm signup" email (`verifyOtp`,
+  type `signup`), resend after 60 s. Cloudflare Turnstile is prepared but OFF:
+  set `TURNSTILE_SITE_KEY` at the top of `auth.js` and put the secret key in
+  Supabase -> Authentication -> Attack Protection.
 - Plan display: `plan-ui.js` is the only browser code that asks `/api/me`; it sets
   `<html data-plan-state>` (loading / signed-out / free / pro) and `style.css` shows
   "Get Pro" or the "Pro" badge. Pro users never see a purchase button.
