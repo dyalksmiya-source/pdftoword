@@ -92,8 +92,13 @@ const visible = $ => ['panelLogin', 'panelSignup', 'panelCode'].filter(k => !$[k
   ok(C({ code: 'captcha_failed' }) === 'captcha' && C({ code: 'weak_password' }) === 'weak_password' && C({ message: '???' }) === 'other' && C(null) === null, 'classify: captcha, weak password, other, none');
 
   // ---- Google
-  const g = A.googleOptions();
+  const g = A.googleOptions('en');
   ok(g.provider === 'google' && g.options.redirectTo === 'https://pdf2wordly.com/' && g.options.queryParams.prompt === 'select_account', 'Google: prompt=select_account, redirect to pdf2wordly.com');
+  for (const l of ['fr', 'ar']) {
+    const S2 = setup({ lang: l });
+    await S2.doc.googles[0].fire('click');
+    ok(S2.client.calls[0][1].options.redirectTo === `https://pdf2wordly.com/${l}/` && S2.client.calls[0][1].options.queryParams.prompt === 'select_account', `Google from ${l}/login.html returns to /${l}/`);
+  }
   let S = setup();
   await S.doc.googles[1].fire('click');
   ok(S.client.calls[0][0] === 'signInWithOAuth' && S.client.calls[0][1].options.queryParams.prompt === 'select_account', 'Google button (sign up tab) uses the account chooser');
@@ -196,8 +201,16 @@ const visible = $ => ['panelLogin', 'panelSignup', 'panelCode'].filter(k => !$[k
   ok(await S.h.signup() === 'agree' && S.client.calls.length === 0 && S.$.signupMessage.textContent === 'Please accept the Terms and Privacy Policy.', 'Terms not accepted: message, no request');
   S = setup(); fillSignup(S.$, { pw: 'short' });
   ok(await S.h.signup() === 'invalid' && S.$.signupPasswordField.classes.has('has-error') && S.client.calls.length === 0, 'short password: field error, no request');
-  S = setup({ answers: { signUp: { error: { code: 'weak_password', message: 'Password should be stronger' } } } }); fillSignup(S.$);
-  ok(await S.h.signup() === 'weak_password' && S.$.signupMessage.textContent.startsWith('Choose a stronger password'), 'weak password from Supabase: message');
+  for (const [pw, why] of [['abcdefgh', 'letters only'], ['12345678', 'digits only'], ['abc123', 'too short'], ['éééééé12', 'no a-z letter']]) {
+    S = setup(); fillSignup(S.$, { pw });
+    ok(await S.h.signup() === 'invalid' && S.$.signupPasswordField.classes.has('has-error') && S.client.calls.length === 0, `password rule in the browser: ${why} refused, no request`);
+  }
+  ok(A.passwordOk('abc12345') && A.passwordOk('ABCDEFG1') && A.passwordOk('pass word 1') && !A.passwordOk('') && !A.passwordOk(null), 'passwordOk: 8+ with a letter and a digit');
+  S = setup({ answers: { signUp: { error: { status: 422, code: 'weak_password', message: 'Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz...' } } } }); fillSignup(S.$);
+  ok(await S.h.signup() === 'weak_password' && S.$.signupMessage.textContent === 'Use at least 8 characters, with letters and digits.' && S.$.signupPasswordField.classes.has('has-error'), 'weak password from Supabase: clear message + field marked');
+  S = setup({ lang: 'ar', answers: { signUp: { error: { code: 'weak_password' } } } }); fillSignup(S.$);
+  await S.h.signup();
+  ok(S.$.signupMessage.textContent === 'استخدم 8 أحرف على الأقل، تتضمن حروفًا وأرقامًا.', 'ar: weak password message');
 
   // ---- log in
   S = setup({ answers: { signInWithPassword: { data: { session: {} }, error: null } } });
@@ -281,12 +294,70 @@ const visible = $ => ['panelLogin', 'panelSignup', 'panelCode'].filter(k => !$[k
     const fh = A.initForgot(fdoc, {}, fc, { captcha: OFF });
     ok(await fh.submit() === 'sent', 'forgot password: sent');
     ok(fc.calls[0][2].redirectTo === 'https://pdf2wordly.com/reset-password.html' && !('captchaToken' in fc.calls[0][2]), 'forgot password: link goes to https://pdf2wordly.com/reset-password.html, no captchaToken');
-    ok(fs.existsSync(path.join(SITE, 'reset-password.html')) && /PASSWORD_RECOVERY/.test(read('reset-password.html')), 'reset-password.html exists and handles PASSWORD_RECOVERY');
+    for (const l of ['fr', 'ar']) {
+      const e3 = { ...els, email: Object.assign(el('e'), { value: 'eve@example.com' }), formBanner: el('fb3') };
+      const fc3 = makeClient();
+      await A.initForgot({ getElementById: id => e3[id], documentElement: { getAttribute: () => l } }, {}, fc3, { captcha: OFF }).submit();
+      ok(fc3.calls[0][2].redirectTo === `https://pdf2wordly.com/${l}/reset-password.html`, `forgot password (${l}): link to /${l}/reset-password.html`);
+    }
+    ok(fs.existsSync(path.join(SITE, 'reset-password.html')) && read('reset-password.html').includes('id="resetForm"'), 'reset-password.html exists (form handled by auth.js initReset)');
     ok(els.formBanner.textContent.startsWith('If an account exists'), 'forgot password: same message for any address');
     const fc2 = makeClient({ resetPasswordForEmail: { error: { status: 429, message: 'rate limit' } } });
     const els2 = { ...els, email: Object.assign(el('e'), { value: 'eve@example.com' }), formBanner: el('fb2') };
     const fh2 = A.initForgot({ getElementById: id => els2[id], documentElement: { getAttribute: () => 'en' } }, {}, fc2, { captcha: OFF });
     ok(await fh2.submit() === 'rate_limit' && els2.formBanner.textContent.startsWith('Too many attempts'), 'forgot password: rate limit message');
+  }
+
+  // ---- reset password
+  {
+    const mk = (lang = 'en') => {
+      const ids = {}; ['resetForm', 'newPassword', 'confirmPassword', 'submitBtn', 'formBanner', 'passwordField', 'confirmField', 'resetState', 'invalidState'].forEach(i => { ids[i] = el(i); });
+      ids.invalidState.hidden = true;
+      return { ids, getElementById: i => ids[i] || null, documentElement: { getAttribute: () => lang } };
+    };
+    const later = [];
+    const w = () => ({ location: { hash: '', search: '', href: null }, setTimeout: (f, ms) => later.push([f, ms]) });
+    let d = mk(); let win = w(); let c = makeClient({ updateUser: null });
+    c.auth.updateUser = async a => { c.calls.push(['updateUser', a]); return { data: {}, error: null }; };
+    c.auth.getSession = async () => ({ data: { session: { access_token: 't' } } });
+    let h = A.initReset(d, win, c, {});
+    for (const [pw, why] of [['abcdefgh', 'letters only'], ['12345678', 'digits only'], ['ab1', 'too short']]) {
+      d.ids.newPassword.value = pw; d.ids.confirmPassword.value = pw;
+      ok(await h.submit() === 'invalid' && d.ids.passwordField.classes.has('has-error') && !c.calls.length, `reset: ${why} refused in the browser`);
+    }
+    d.ids.newPassword.value = 'newpass12'; d.ids.confirmPassword.value = 'newpass13';
+    ok(await h.submit() === 'invalid' && d.ids.confirmField.classes.has('has-error') && !d.ids.passwordField.classes.has('has-error') && !c.calls.length, 'reset: passwords that do not match refused');
+    d.ids.confirmPassword.value = 'newpass12';
+    ok(await h.submit() === 'updated' && c.calls[0][1].password === 'newpass12' && d.ids.formBanner.textContent.startsWith('Your password has been updated'), 'reset: updateUser with the new password');
+    later.filter(([, ms]) => ms === 1500).forEach(([f]) => f());
+    ok(win.location.href === '/', 'reset: then home');
+    // Supabase errors
+    for (const [err, kind, text] of [
+      [{ status: 422, code: 'weak_password', message: 'Password should contain...' }, 'weak_password', 'Use at least 8 characters, with letters and digits.'],
+      [{ status: 422, code: 'same_password', message: 'New password should be different from the old password.' }, 'same_password', 'Choose a password different from your current one.'],
+      [{ status: 429, message: 'rate limit' }, 'rate_limit', 'Too many attempts. Wait a few minutes, then try again.']]) {
+      d = mk(); c = makeClient(); c.auth.updateUser = async () => ({ error: err });
+      h = A.initReset(d, w(), c, { checkLink: false });
+      d.ids.newPassword.value = 'newpass12'; d.ids.confirmPassword.value = 'newpass12';
+      ok(await h.submit() === kind && d.ids.formBanner.textContent === text, `reset: Supabase ${kind} -> "${text}"`);
+    }
+    d = mk('fr'); c = makeClient(); c.auth.updateUser = async () => ({ error: { code: 'weak_password' } });
+    h = A.initReset(d, w(), c, { checkLink: false });
+    d.ids.newPassword.value = 'newpass12'; d.ids.confirmPassword.value = 'newpass12';
+    await h.submit();
+    ok(d.ids.formBanner.textContent === 'Utilisez au moins 8 caractères, avec des lettres et des chiffres.', 'reset (fr): weak password message');
+    // invalid link
+    d = mk(); c = makeClient(); c.auth.getSession = async () => ({ data: { session: null } });
+    h = A.initReset(d, w(), c, { checkLink: false });
+    ok(await h.checkLink() === 'invalid' && d.ids.resetState.hidden && !d.ids.invalidState.hidden, 'reset: no session and no recovery data -> "This link isn\'t valid"');
+    d = mk(); const w2 = w(); w2.location.hash = '#access_token=x&type=recovery';
+    h = A.initReset(d, w2, c, { checkLink: false });
+    ok(await h.checkLink() === 'ok', 'reset: recovery link accepted');
+    d = mk('ar'); c = makeClient(); c.auth.updateUser = async () => ({ data: {}, error: null }); later.length = 0;
+    const w3 = w(); h = A.initReset(d, w3, c, { checkLink: false });
+    d.ids.newPassword.value = 'newpass12'; d.ids.confirmPassword.value = 'newpass12'; await h.submit();
+    later.forEach(([f]) => f());
+    ok(w3.location.href === '/ar/', 'reset (ar): then /ar/');
   }
 
   // ---- pages
@@ -306,6 +377,24 @@ const visible = $ => ['panelLogin', 'panelSignup', 'panelCode'].filter(k => !$[k
     ok(s.includes(`<script src="${pre}auth.js" defer></script>`) && !/signInWithPassword|alert\(/.test(s), `${f}: logic in auth.js, no alert()`);
     ok(s.includes('href="/login.html"') && s.includes('href="/fr/login.html"') && s.includes('href="/ar/login.html"'), `${f}: language switcher -> login pages`);
     ok(s.includes('noindex'), `${f}: noindex kept`);
+    ok(!/remember/i.test(s), `${f}: no "Remember me"`);
+    ok(s.includes(`href="forgot-password.html" class="link-inline"`), `${f}: "Forgot password?" -> same-language page`);
+    const hint = { en: 'At least 8 characters, with letters and digits.', fr: 'Au moins 8 caractères, avec des lettres et des chiffres.', ar: '8 أحرف على الأقل، تتضمن حروفًا وأرقامًا.' }[lang];
+    ok(s.includes(`<p class="field-hint">${hint}</p>`), `${f}: password rule under the field`);
+  }
+  for (const [f, lang, pre] of [['forgot-password.html', 'en', ''], ['fr/forgot-password.html', 'fr', '../'], ['ar/forgot-password.html', 'ar', '../'],
+                                ['reset-password.html', 'en', ''], ['fr/reset-password.html', 'fr', '../'], ['ar/reset-password.html', 'ar', '../']]) {
+    const s = read(f);
+    const page = f.split('/').pop();
+    ok(s.includes(`<html lang="${lang}"`) && (lang !== 'ar' || s.includes('dir="rtl"')) && s.includes('noindex'), `${f}: lang, noindex`);
+    ok(s.includes(`<script src="${pre}auth.js" defer></script>`) && !/updateUser|resetPasswordForEmail|alert\(/.test(s), `${f}: logic in auth.js`);
+    ok(['', 'fr/', 'ar/'].every(x => s.includes(`href="/${x}${page}"`)), `${f}: language switcher -> ${page} in each language`);
+    if (page === 'reset-password.html') {
+      const hint = { en: 'At least 8 characters, with letters and digits.', fr: 'Au moins 8 caractères, avec des lettres et des chiffres.', ar: '8 أحرف على الأقل، تتضمن حروفًا وأرقامًا.' }[lang];
+      ok(s.includes(`<p class="field-hint">${hint}</p>`) && ['resetForm', 'newPassword', 'confirmPassword', 'passwordField', 'confirmField', 'invalidState'].every(i => s.includes(`id="${i}"`)), `${f}: password rule + form elements`);
+    } else {
+      ok(s.includes('data-captcha="forgot" hidden') && s.includes('href="login.html"'), `${f}: Turnstile slot, back to the same-language login`);
+    }
   }
   ok(read('forgot-password.html').includes('data-captcha="forgot" hidden') && read('forgot-password.html').includes('<script src="auth.js" defer></script>'), 'forgot-password.html: Turnstile slot + auth.js');
   for (const f of ['fr/index.html', 'ar/index.html', 'fr/delete-account.html', 'ar/delete-account.html']) {

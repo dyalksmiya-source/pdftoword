@@ -102,6 +102,10 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   type `signup`), resend after 60 s. Cloudflare Turnstile is prepared but OFF:
   set `TURNSTILE_SITE_KEY` at the top of `auth.js` and put the secret key in
   Supabase -> Authentication -> Attack Protection.
+- Supabase Redirect URLs (Authentication -> URL Configuration): `https://pdf2wordly.com/`,
+  `/fr/`, `/ar/` (Google returns to the page language) and `/reset-password.html`,
+  `/fr/reset-password.html`, `/ar/reset-password.html` (password reset links).
+  Passwords: at least 8 characters with letters and digits (checked in `auth.js`).
 - Plan display: `plan-ui.js` is the only browser code that asks `/api/me`; it sets
   `<html data-plan-state>` (loading / signed-out / free / pro) and `style.css` shows
   "Get Pro" or the "Pro" badge. Pro users never see a purchase button.

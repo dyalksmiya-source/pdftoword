@@ -12,6 +12,10 @@
  * - After sign-in: back to the pricing section the user came from
  *   (sessionStorage "pw-return", same allowlist as billing.js), else the home
  *   page in the page language.
+ * - Passwords: at least 8 characters with letters and digits (same rule as
+ *   Supabase), checked here before calling Supabase (sign up, reset).
+ * - Google, the reset link and the end of a reset go back to the page
+ *   language (/, /fr/, /ar/).
  * - Cloudflare Turnstile: OFF while TURNSTILE_SITE_KEY is ''. Then no widget
  *   is loaded and no captchaToken is sent.
  *
@@ -26,9 +30,17 @@
   // goes in Supabase -> Authentication -> Attack Protection (never here).
   var TURNSTILE_SITE_KEY = '';
   var TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-  // Must be in Supabase -> Authentication -> URL Configuration -> Redirect URLs.
-  var OAUTH_REDIRECT_URL = 'https://pdf2wordly.com/';
-  var RESET_PASSWORD_URL = 'https://pdf2wordly.com/reset-password.html';
+  // All must be in Supabase -> Authentication -> URL Configuration -> Redirect URLs.
+  var OAUTH_REDIRECT_URLS = {
+    en: 'https://pdf2wordly.com/',
+    fr: 'https://pdf2wordly.com/fr/',
+    ar: 'https://pdf2wordly.com/ar/',
+  };
+  var RESET_PASSWORD_URLS = {
+    en: 'https://pdf2wordly.com/reset-password.html',
+    fr: 'https://pdf2wordly.com/fr/reset-password.html',
+    ar: 'https://pdf2wordly.com/ar/reset-password.html',
+  };
   // -------------------------------------------------------------------------------
 
   var CODE_LENGTH = 6;
@@ -39,6 +51,7 @@
   var ALLOWED_RETURNS = ['/#pricing', '/fr/#pricing', '/ar/#pricing'];
   var HOME = { en: '/', fr: '/fr/', ar: '/ar/' };
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var PASSWORD_MIN = 8;
 
   var I18N = {
     fr: {
@@ -55,7 +68,14 @@
       'Wrong email or password.': 'E-mail ou mot de passe incorrect.',
       'This email already has an account. Enter your password below to log in.': 'Cette adresse e-mail a déjà un compte. Saisissez votre mot de passe ci-dessous pour vous connecter.',
       'Please accept the Terms and Privacy Policy.': 'Veuillez accepter les conditions d’utilisation et la politique de confidentialité.',
-      'Choose a stronger password (at least 8 characters).': 'Choisissez un mot de passe plus sûr (au moins 8 caractères).',
+      'Use at least 8 characters, with letters and digits.': 'Utilisez au moins 8 caractères, avec des lettres et des chiffres.',
+      'Choose a password different from your current one.': 'Choisissez un mot de passe différent de l’actuel.',
+      'Sending…': 'Envoi…',
+      'Send reset link': 'Envoyer le lien',
+      'If an account exists for that email, a reset link is on its way. Check your inbox (and spam folder).': 'Si un compte existe pour cette adresse, un lien de réinitialisation est en route. Vérifiez votre boîte de réception (et les spams).',
+      'Updating…': 'Mise à jour…',
+      'Update password': 'Mettre à jour le mot de passe',
+      'Your password has been updated. Redirecting you now…': 'Votre mot de passe a été mis à jour. Redirection en cours…',
       'Too many attempts. Wait a few minutes, then try again.': 'Trop de tentatives. Patientez quelques minutes, puis réessayez.',
       'Connection problem. Check your internet and try again.': 'Problème de connexion. Vérifiez votre connexion Internet et réessayez.',
       'Something went wrong. Please try again later.': 'Une erreur est survenue. Veuillez réessayer plus tard.',
@@ -89,7 +109,14 @@
       'Wrong email or password.': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
       'This email already has an account. Enter your password below to log in.': 'هذا البريد الإلكتروني لديه حساب بالفعل. أدخل كلمة المرور أدناه لتسجيل الدخول.',
       'Please accept the Terms and Privacy Policy.': 'يرجى قبول شروط الاستخدام وسياسة الخصوصية.',
-      'Choose a stronger password (at least 8 characters).': 'اختر كلمة مرور أقوى (8 أحرف على الأقل).',
+      'Use at least 8 characters, with letters and digits.': 'استخدم 8 أحرف على الأقل، تتضمن حروفًا وأرقامًا.',
+      'Choose a password different from your current one.': 'اختر كلمة مرور مختلفة عن كلمة المرور الحالية.',
+      'Sending…': 'جارٍ الإرسال…',
+      'Send reset link': 'إرسال رابط إعادة التعيين',
+      'If an account exists for that email, a reset link is on its way. Check your inbox (and spam folder).': 'إذا كان هناك حساب بهذا البريد الإلكتروني، فإن رابط إعادة التعيين في الطريق إليك. تحقّق من بريدك الوارد (ومجلد الرسائل غير المرغوب فيها).',
+      'Updating…': 'جارٍ التحديث…',
+      'Update password': 'تحديث كلمة المرور',
+      'Your password has been updated. Redirecting you now…': 'تم تحديث كلمة المرور. جارٍ إعادة توجيهك…',
       'Too many attempts. Wait a few minutes, then try again.': 'محاولات كثيرة جدًا. انتظر بضع دقائق ثم حاول مرة أخرى.',
       'Connection problem. Check your internet and try again.': 'مشكلة في الاتصال. تحقّق من اتصالك بالإنترنت وحاول مرة أخرى.',
       'Something went wrong. Please try again later.': 'حدث خطأ ما. يرجى المحاولة لاحقًا.',
@@ -144,7 +171,8 @@
     if (code === 'otp_expired' || code === 'otp_disabled' || /expired or is invalid|token has expired|invalid otp|otp.*(expired|invalid)/.test(msg)) return 'otp';
     if (code === 'invalid_credentials' || /invalid login credentials/.test(msg)) return 'invalid_credentials';
     if (code === 'user_already_exists' || code === 'email_exists' || /already (registered|exists|been registered)/.test(msg)) return 'already_registered';
-    if (code === 'weak_password' || /password should|weak password/.test(msg)) return 'weak_password';
+    if (code === 'same_password' || /different from the old password|same password/.test(msg)) return 'same_password';
+    if (code === 'weak_password' || /password should|weak password|password is known/.test(msg)) return 'weak_password';
     return 'other';
   }
 
@@ -153,6 +181,12 @@
     if (kind === 'network') return t('Connection problem. Check your internet and try again.');
     if (kind === 'captcha') return t('Please complete the security check.');
     return t('Something went wrong. Please try again later.');
+  }
+
+  /** Supabase rule: at least 8 characters, with a letter and a digit. */
+  function passwordOk(pw) {
+    pw = String(pw || '');
+    return pw.length >= PASSWORD_MIN && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw);
   }
 
   /** Where to go after sign-in: the pricing section saved by billing.js, else home. */
@@ -167,10 +201,11 @@
     return HOME[lang(doc)];
   }
 
-  function googleOptions() {
+  /** Google returns to the home page of the page language (pricing return: billing.js). */
+  function googleOptions(l) {
     return {
       provider: 'google',
-      options: { redirectTo: OAUTH_REDIRECT_URL, queryParams: { prompt: 'select_account' } },
+      options: { redirectTo: OAUTH_REDIRECT_URLS[l] || OAUTH_REDIRECT_URLS.en, queryParams: { prompt: 'select_account' } },
     };
   }
 
@@ -396,7 +431,7 @@
     // -- Google
     async function google() {
       try {
-        var r = await client.auth.signInWithOAuth(googleOptions());
+        var r = await client.auth.signInWithOAuth(googleOptions(lang(doc)));
         if (r && r.error) { show(msg[state.tab] || msg.login, 'error', commonMessage(classifyError(r.error), t)); return 'error'; }
         return 'redirecting';
       } catch (e) {
@@ -445,7 +480,7 @@
       var password = String(($('signupPassword') || {}).value || '');
       var ok = field('signupNameField', name.length > 0)
         & field('signupEmailField', EMAIL_RE.test(email))
-        & field('signupPasswordField', password.length >= 8);
+        & field('signupPasswordField', passwordOk(password));
       if (!ok) return 'invalid';
       var agree = $('signupAgree');
       if (agree && !agree.checked) { show(msg.signup, 'error', t('Please accept the Terms and Privacy Policy.')); return 'agree'; }
@@ -463,7 +498,11 @@
       captcha.reset('signup');
       var kind = classifyError(r && r.error);
       if (kind === 'already_registered') return alreadyRegistered(email);
-      if (kind === 'weak_password') { show(msg.signup, 'error', t('Choose a stronger password (at least 8 characters).')); return kind; }
+      if (kind === 'weak_password') {
+        field('signupPasswordField', false);
+        show(msg.signup, 'error', t('Use at least 8 characters, with letters and digits.'));
+        return kind;
+      }
       if (kind) { show(msg.signup, 'error', commonMessage(kind, t)); return kind; }
       var data = (r && r.data) || {};
       if (data.session) return goSignedIn();
@@ -600,18 +639,18 @@
       if (fieldEl && fieldEl.classList) fieldEl.classList.toggle('has-error', !ok);
       if (!ok) return 'invalid';
       if (captcha.enabled && !captcha.token('forgot')) { showBanner('error', t('Please complete the security check.')); return 'captcha'; }
-      if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
-      var options = { redirectTo: RESET_PASSWORD_URL };
+      if (btn) { btn.disabled = true; btn.textContent = t('Sending…'); }
+      var options = { redirectTo: RESET_PASSWORD_URLS[lang(doc)] };
       var copt = captcha.options('forgot');
       if (copt) options.captchaToken = copt.captchaToken;
       var r;
       try { r = await client.auth.resetPasswordForEmail(email, options); } catch (e) { r = { error: { name: 'AuthRetryableFetchError', message: 'Failed to fetch' } }; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Send reset link'; }
+      if (btn) { btn.disabled = false; btn.textContent = t('Send reset link'); }
       captcha.reset('forgot');
       var kind = classifyError(r && r.error);
       if (kind) { showBanner('error', commonMessage(kind, t)); return kind; }
       // Same message whether or not the address has an account.
-      showBanner('success', 'If an account exists for that email, a reset link is on its way. Check your inbox (and spam folder).');
+      showBanner('success', t('If an account exists for that email, a reset link is on its way. Check your inbox (and spam folder).'));
       if (form.reset) form.reset();
       return 'sent';
     }
@@ -619,8 +658,74 @@
     return { submit: submit };
   }
 
+  // ---- Reset password (page opened from the email link) ------------------------------
+  function initReset(doc, win, client, opts) {
+    opts = opts || {};
+    var t = translator(doc);
+    var $ = function (id) { return doc.getElementById(id); };
+    var form = $('resetForm');
+    var pw = $('newPassword');
+    var confirmInput = $('confirmPassword');
+    var btn = $('submitBtn');
+    var banner = $('formBanner');
+    if (!form || !pw) return null;
+    var state = { done: false };
+    function showBanner(kind, text) {
+      if (!banner) return;
+      banner.textContent = text;
+      banner.className = 'auth-banner is-visible ' + (kind === 'error' ? 'auth-banner-error' : 'auth-banner-success');
+    }
+    function showInvalid() {
+      if ($('resetState')) $('resetState').hidden = true;
+      if ($('invalidState')) $('invalidState').hidden = false;
+    }
+    // The link signs the user in for this one change; without a session and
+    // without recovery data in the URL, the link was invalid or used.
+    async function checkLink() {
+      var session = null;
+      try { var r = await client.auth.getSession(); session = r && r.data && r.data.session; } catch (e) { session = null; }
+      var hasRecovery = /type=recovery/.test(String(win.location.hash || '')) || /[?&]code=/.test(String(win.location.search || ''));
+      if (!session && !hasRecovery) { showInvalid(); return 'invalid'; }
+      return 'ok';
+    }
+    async function submit(ev) {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (state.busy || state.done) return 'busy';
+      if (banner) { banner.className = 'auth-banner'; banner.textContent = ''; }
+      var password = String(pw.value || '');
+      var ok = passwordOk(password);
+      var same = ok && confirmInput && password === String(confirmInput.value || '');
+      if ($('passwordField') && $('passwordField').classList) $('passwordField').classList.toggle('has-error', !ok);
+      if ($('confirmField') && $('confirmField').classList) $('confirmField').classList.toggle('has-error', ok && !same);
+      if (!ok || !same) return 'invalid';
+      state.busy = true;
+      if (btn) { btn.disabled = true; btn.textContent = t('Updating…'); }
+      var r;
+      try { r = await client.auth.updateUser({ password: password }); } catch (e) { r = { error: { name: 'AuthRetryableFetchError', message: 'Failed to fetch' } }; }
+      state.busy = false;
+      if (btn) { btn.disabled = false; btn.textContent = t('Update password'); }
+      var kind = classifyError(r && r.error);
+      if (kind === 'weak_password') {
+        if ($('passwordField') && $('passwordField').classList) $('passwordField').classList.toggle('has-error', true);
+        showBanner('error', t('Use at least 8 characters, with letters and digits.'));
+        return kind;
+      }
+      if (kind === 'same_password') { showBanner('error', t('Choose a password different from your current one.')); return kind; }
+      if (kind) { showBanner('error', commonMessage(kind, t)); return kind; }
+      state.done = true;
+      showBanner('success', t('Your password has been updated. Redirecting you now…'));
+      if (form.reset) form.reset();
+      (win.setTimeout || setTimeout)(function () { win.location.href = HOME[lang(doc)]; }, 1500);
+      return 'updated';
+    }
+    form.addEventListener('submit', submit);
+    if (opts.checkLink !== false) (win.setTimeout || setTimeout)(checkLink, 1200);
+    return { submit: submit, checkLink: checkLink };
+  }
+
   var api = {
-    TURNSTILE_SITE_KEY: TURNSTILE_SITE_KEY, OAUTH_REDIRECT_URL: OAUTH_REDIRECT_URL, RESET_PASSWORD_URL: RESET_PASSWORD_URL,
+    TURNSTILE_SITE_KEY: TURNSTILE_SITE_KEY, OAUTH_REDIRECT_URLS: OAUTH_REDIRECT_URLS, RESET_PASSWORD_URLS: RESET_PASSWORD_URLS,
+    passwordOk: passwordOk, initReset: initReset,
     I18N: I18N, cleanCode: cleanCode, classifyError: classifyError, returnTarget: returnTarget, googleOptions: googleOptions,
     createCaptcha: createCaptcha, initLogin: initLogin, initForgot: initForgot, wireChrome: wireChrome, translator: translator,
   };
@@ -633,6 +738,7 @@
       wireChrome(document, window, translator(document));
       if (document.getElementById('loginForm')) initLogin(document, window, client);
       if (document.getElementById('forgotForm')) initForgot(document, window, client);
+      if (document.getElementById('resetForm')) initReset(document, window, client);
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
     else start();
