@@ -62,17 +62,34 @@ ok(N === '100', 'site-config pro-daily-limit = 100');
 ok(new RegExp(`PRO_DAILY_LIMIT = int\\(os.environ.get\\("PRO_DAILY_LIMIT", "${N}"\\)\\)`).test(read('server.py')), 'server default limit = site-config number');
 const span = `<span data-config="pro-daily-limit">${N}</span>`;
 for (const [f, li, faq, ld] of [
-  ['index.html', `<li>Fair use: up to ${span} files per day</li>`, `Pro removes that limit (fair use: up to ${span} files per day).`, `Pro removes that limit (fair use: up to ${N} files per day)."`],
-  ['fr/index.html', `<li>Usage raisonnable : jusqu’à ${span} fichiers par jour</li>`, `supprime cette limite (usage raisonnable : jusqu’à ${span} fichiers par jour).`, `supprime cette limite (usage raisonnable : jusqu’à ${N} fichiers par jour)."`],
-  ['ar/index.html', `<li>استخدام عادل: حتى ${span} ملف يوميًا</li>`, `تزيل هذا الحد (استخدام عادل: حتى ${span} ملف يوميًا).`, `تزيل هذا الحد (استخدام عادل: حتى ${N} ملف يوميًا)."`]]) {
+  ['index.html', `<li>Up to ${span} files per day</li>`, `Pro allows up to ${span} files per day.</p>`, `Pro allows up to ${N} files per day."`],
+  ['fr/index.html', `<li>Jusqu’à ${span} fichiers par jour</li>`, `La formule Pro permet jusqu’à ${span} fichiers par jour.</p>`, `La formule Pro permet jusqu’à ${N} fichiers par jour."`],
+  ['ar/index.html', `<li>حتى ${span} ملف يوميًا</li>`, `وباقة Pro تتيح حتى ${span} ملف يوميًا.</p>`, `وباقة Pro تتيح حتى ${N} ملف يوميًا."`]]) {
   const s = read(f);
   const card = s.slice(s.indexOf('price-card-featured'), s.indexOf('id="proCta"'));
-  ok(card.includes(li), `${f}: pricing card fair-use line`);
+  ok(card.includes(li) && (card.match(/<li>/g) || []).length === 4, `${f}: pricing card "${li.replace(/<[^>]+>/g, '')}" (4 items, no separate fair-use line)`);
   ok(s.includes(faq), `${f}: FAQ answer`);
   ok(s.includes(ld), `${f}: FAQ structured data says the same number (${N})`);
 }
+
+// ---- no page promises unlimited use
+const pages = fs.readdirSync(SITE).filter(x => x.endsWith('.html') || x === 'llms.txt')
+  .concat(fs.readdirSync(path.join(SITE, 'fr')).map(x => 'fr/' + x), fs.readdirSync(path.join(SITE, 'ar')).map(x => 'ar/' + x))
+  .filter(x => /\.(html|txt)$/.test(x));
+const UNLIMITED = /unlimited|illimit|sans limite|غير محدود|بلا حدود|removes? (that|the) (daily )?(conversion )?limit|lève les limites|supprime cette limite|تزيل هذا الحد|يزيل الحدود|never stall/i;
+const offenders = pages.filter(x => UNLIMITED.test(read(x)));
+ok(pages.length >= 30 && offenders.length === 0, `no page promises unlimited use (${pages.length} files checked)` + (offenders.length ? ': ' + offenders.join(', ') : ''));
+// every number written in structured data / llms.txt is the config number
+const lits = [];
+for (const x of pages) {
+  for (const m of read(x).matchAll(/up to (\d+) files per day|jusqu’à (\d+) fichiers par jour|حتى (\d+) ملف يوميًا/g)) lits.push([x, m[1] || m[2] || m[3]]);
+}
+ok(lits.length >= 8 && lits.every(([, n]) => n === N), `${lits.length} plain "${N} files per day" mentions (structured data, llms.txt) match site-config`);
+// page text uses the config span everywhere else
+const spans = pages.reduce((n, x) => n + (read(x).match(/data-config="pro-daily-limit"/g) || []).length, 0);
+ok(spans >= 15, `${spans} page mentions come from site-config (data-config="pro-daily-limit")`);
 const terms = read('terms.html');
-ok(terms.includes(`fair use: up to ${span} files per day (rolling 24 hours)`), 'terms: fair use');
+ok(terms.includes(`<li>Up to ${span} files per day (rolling 24 hours)</li>`), 'terms: up to 100 files per day');
 ok(terms.includes('After a refund, the account cannot subscribe to Pro again.'), 'terms: no Pro again after a refund');
 ok(terms.includes('per month (USD), taxes included.') && !terms.includes('plus any tax'), 'terms: price includes tax (as in Paddle)');
 ok(!terms.includes('available when Pro launches'), 'terms: no "available when Pro launches"');

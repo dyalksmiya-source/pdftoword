@@ -479,7 +479,7 @@ def convert():
     pro_claim_id = None
 
     # 4. Free users: atomically claim their 24h slot (race-safe RPC that
-    #    locks the row). Pro users skip this entirely (unlimited).
+    #    locks the row). Pro users skip this (fair use below).
     if not pro:
         try:
             claim = admin.rpc("claim_free_conversion",
@@ -502,8 +502,8 @@ def convert():
                     retry_after = None
                 payload = {"code": "FREE_LIMIT_REACHED",
                            "error": ("You have used your free conversion for the last "
-                                     "24 hours. Try again later or upgrade to Pro for "
-                                     "unlimited conversions.")}
+                                     "24 hours. Try again later or upgrade to Pro "
+                                     f"(up to {PRO_DAILY_LIMIT} files per day).")}
                 if retry_after is not None:
                     payload["retry_after_seconds"] = retry_after
                 return jsonify(payload), 429

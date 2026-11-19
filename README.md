@@ -3,7 +3,7 @@
 A PDF → Word converter: static frontend (`index.html` / `style.css` / `script.js`,
 served from GitHub Pages at `https://pdf2wordly.com`) plus a secure Flask
 backend (`server.py`, hosted on Railway) that authenticates via Supabase,
-enforces the Free 24h limit / Pro unlimited rule server-side, and converts
+enforces the Free 24h limit / Pro fair-use rule (100 files per rolling 24h) server-side, and converts
 with `pdf2docx` (OCR fallback for scanned PDFs).
 
 ## Architecture
