@@ -31,7 +31,7 @@ function homePage(lang = 'en') {
   const label = { en: 'Pro is coming soon', fr: 'Pro arrive bientôt', ar: 'Pro قريبًا' }[lang];
   const span = el('span', { id: 'proCta', text: label });
   card.appendChild(span);
-  const price = el('span', { text: '$2.99' });
+  const price = el('span', { text: '$4.99' });
   const badge = el('span', { 'data-plan-badge': '' }); badge.hidden = true;
   const head = el('head');
   const doc = {
@@ -92,7 +92,7 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
   ok(B.flagEnabled(throwing) === false, 'flag: blocked storage -> hidden, no crash');
 
   // ---- with the flag: label in en, fr, ar; Paddle initialised
-  for (const [lang, label] of [['en', 'Subscribe – $2.99/month'], ['fr', 'S’abonner – $2.99/mois'], ['ar', 'اشترك – $2.99 شهريًا']]) {
+  for (const [lang, label] of [['en', 'Subscribe – $4.99/month'], ['fr', 'S’abonner – $4.99/mois'], ['ar', 'اشترك – $4.99 شهريًا']]) {
     const p = paddleMock();
     doc = homePage(lang);
     w = windowMock({ path: lang === 'en' ? '/' : `/${lang}/`, search: '?paddle=sandbox', paddle: p });

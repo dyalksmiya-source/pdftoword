@@ -13,7 +13,7 @@ with `pdf2docx` (OCR fallback for scanned PDFs).
 | Frontend | GitHub Pages → `https://pdf2wordly.com` |
 | Backend  | Railway (Flask, `server.py`, `Dockerfile`) |
 | Auth + DB| Supabase (`public.profiles`, RLS, trigger) |
-| Payments | Paddle Billing, Merchant of Record (Pro Monthly $2.99): `billing.js` + `billing.py`, sandbox only for now |
+| Payments | Paddle Billing, Merchant of Record (Pro Monthly $4.99): `billing.js` + `billing.py`, sandbox only for now |
 
 ## Run it locally
 

@@ -241,7 +241,7 @@
     if (!placeholder) return 'no-button';
     var t = TEXT[lang(doc)];
     var priceEl = doc.querySelector('[data-config="pro-price"]');
-    var price = (priceEl && priceEl.textContent.trim()) || '$2.99';
+    var price = (priceEl && priceEl.textContent.trim()) || '$4.99';
 
     var status = doc.createElement('p');
     status.className = 'pro-status';
