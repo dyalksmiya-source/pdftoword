@@ -281,9 +281,26 @@ const meFetch = body => async () => { meFetch.calls = (meFetch.calls || 0) + 1; 
       ok(!ad.ids.billingActions.hidden && !ad.ids.manageSubscription.hidden && ad.ids.cancelSubscription.hidden, `scheduled (${lang}): Cancel hidden, Manage kept`);
       ok(!ad.ids.billingNote.hidden && ad.ids.billingNote.textContent === text, `scheduled (${lang}): note "${text.slice(0, 40)}…"`);
     }
+    const RENEWS = 'Your subscription renews automatically every month until you cancel it.';
+    for (const [lang, text] of [['en', RENEWS], ['fr', 'Votre abonnement se renouvelle automatiquement chaque mois jusqu’à ce que vous le résiliiez.'], ['ar', 'يتجدد اشتراكك تلقائيًا كل شهر إلى أن تلغيه.']]) {
+      ad = accountDoc(); aw = { location: { href: null }, pwT: k => (DICT[lang] && DICT[lang][k]) || k };
+      A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle', subscription_status: 'active', cancel_scheduled: false }, 'https://api', 'tok', portalFetch);
+      ok(!ad.ids.cancelSubscription.hidden && !ad.ids.billingNote.hidden && ad.ids.billingNote.textContent === text, `renewing (${lang}): "${text.slice(0, 40)}…"`);
+    }
+    for (const st of ['trialing', 'past_due']) {
+      ad = accountDoc(); aw = { location: { href: null } };
+      A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle', subscription_status: st, cancel_scheduled: false }, 'https://api', 'tok', portalFetch);
+      ok(ad.ids.billingNote.textContent === RENEWS, `renewing (${st}): renewal line`);
+    }
+    ad = accountDoc(); aw = { location: { href: null } };
+    A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle', subscription_status: 'active', cancel_scheduled: true }, 'https://api', 'tok', portalFetch);
+    ok(ad.ids.billingNote.textContent === NOTE && !ad.ids.billingNote.textContent.includes('renews automatically'), 'scheduled: only "will not renew", no renewal line');
+    ad = accountDoc(); aw = { location: { href: null } };
+    A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle', subscription_status: 'canceled', cancel_scheduled: false }, 'https://api', 'tok', portalFetch);
+    ok(ad.ids.billingNote.hidden && ad.ids.billingNote.textContent === '', 'canceled (Pro until end): no renewal line');
     ad = accountDoc(); aw = { location: { href: null } };
     A.setupBilling(ad, aw, { plan: 'pro', billing_source: 'paddle', cancel_scheduled: false }, 'https://api', 'tok', portalFetch);
-    ok(!ad.ids.cancelSubscription.hidden && ad.ids.billingNote.hidden && ad.ids.billingNote.textContent === '', 'not scheduled: Cancel shown, no note');
+    ok(!ad.ids.cancelSubscription.hidden && ad.ids.billingNote.hidden && ad.ids.billingNote.textContent === '', 'no status: Cancel shown, no note');
     ad = accountDoc(); aw = { location: { href: null } };
     A.setupBilling(ad, aw, { plan: 'free', cancel_scheduled: true }, 'https://api', 'tok', portalFetch);
     ok(ad.ids.billingActions.hidden && ad.ids.billingNote.hidden, 'free: no buttons, no note');

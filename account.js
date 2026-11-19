@@ -21,7 +21,7 @@
   var ERROR_TEXT = "We couldn't load your plan. Please try again later.";
   var PORTAL_ERROR_TEXT = "We couldn't open the subscription page. Please try again later.";
   var DELETE_TEXT = {
-    blocked: 'You have a Pro subscription that will renew. Cancel it first in ',
+    blocked: 'You have a Pro subscription that is still active or paused. Cancel it first in ',
     manage: 'Manage subscription',
     blockedEnd: ', then delete your account.',
     expired: 'Your session has expired. Please log in again, then try again.',
@@ -32,6 +32,8 @@
   };
   var SUPABASE_STORAGE_KEY = 'sb-yjxfxdbrjsiuevnkiiak-auth-token';
   var WILL_NOT_RENEW_TEXT = 'Your subscription will not renew. You can resume it from Manage subscription.';
+  var RENEWS_TEXT = 'Your subscription renews automatically every month until you cancel it.';
+  var RENEWING_STATUSES = ['active', 'trialing', 'past_due'];
 
   /** Site i18n (pwT from script.js); English when it is not there. */
   function tr(win, text) {
@@ -105,8 +107,12 @@
     if (cancelButton) cancelButton.hidden = scheduled;
     var note = doc.getElementById('billingNote');
     if (note) {
-      note.textContent = scheduled ? tr(win, WILL_NOT_RENEW_TEXT) : '';
-      note.hidden = !scheduled;
+      // One line under the status: "will not renew" when a cancellation is
+      // scheduled, otherwise "renews automatically" for a renewing subscription.
+      var status = String(me.subscription_status || '').toLowerCase();
+      var renewing = !scheduled && RENEWING_STATUSES.indexOf(status) !== -1;
+      note.textContent = scheduled ? tr(win, WILL_NOT_RENEW_TEXT) : renewing ? tr(win, RENEWS_TEXT) : '';
+      note.hidden = !(scheduled || renewing);
     }
     var err = doc.getElementById('billingError');
     async function open(which, button) {

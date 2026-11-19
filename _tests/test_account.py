@@ -90,11 +90,11 @@ class BlockRuleTests(unittest.TestCase):
         f = billing.blocks_account_deletion
         self.assertFalse(f(None))
         self.assertFalse(f(profile()))
-        for st in ("active", "trialing", "past_due"):
+        for st in ("active", "trialing", "past_due", "paused"):
             self.assertTrue(f(profile(subscription_status=st, **PADDLE)), st)
             self.assertFalse(f(profile(subscription_status=st, cancel_at="2099-01-01T00:00:00Z", **PADDLE)),
                              st + " + scheduled cancel")
-        for st in ("canceled", "cancelled", "paused", None, ""):
+        for st in ("canceled", "cancelled", None, ""):
             self.assertFalse(f(profile(subscription_status=st, **PADDLE)), str(st))
         # an old status without a Paddle subscription does not block
         self.assertFalse(f(profile(subscription_status="active", plan="pro")))
@@ -144,8 +144,17 @@ class DeleteAccountTests(unittest.TestCase):
         r, _ = self.delete(FakeAdmin(profile(subscription_status="canceled", **PADDLE)))
         self.assertEqual(r.status_code, 200)
 
-    def test_paused_is_allowed(self):
-        r, _ = self.delete(FakeAdmin(profile(subscription_status="paused", **PADDLE)))
+    def test_paused_is_409(self):
+        # a pause can resume and charge a deleted user
+        r, calls = self.delete(FakeAdmin(profile(subscription_status="paused", **PADDLE)))
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.get_json()["code"], "SUBSCRIPTION_ACTIVE")
+        self.assertIn("active or paused", r.get_json()["error"])
+        self.assertEqual(calls, [("profiles.select", USER)], "nothing deleted")
+
+    def test_paused_with_scheduled_cancel_is_allowed(self):
+        r, _ = self.delete(FakeAdmin(profile(subscription_status="paused",
+                                             cancel_at="2099-01-01T00:00:00Z", **PADDLE)))
         self.assertEqual(r.status_code, 200)
 
     def test_profile_already_gone_still_deletes_auth_user(self):

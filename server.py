@@ -396,8 +396,8 @@ def delete_account():
     if billing.blocks_account_deletion(profile):
         logger.info("Account deletion: SUBSCRIPTION_ACTIVE")
         return jsonify({"code": "SUBSCRIPTION_ACTIVE",
-                        "error": ("You have a Pro subscription that will renew. Cancel it "
-                                  "first in Manage subscription, then delete your account.")}), 409
+                        "error": ("You have a Pro subscription that is still active or paused. "
+                                  "Cancel it first in Manage subscription, then delete your account.")}), 409
 
     try:
         if profile is not None:

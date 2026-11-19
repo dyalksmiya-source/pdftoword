@@ -82,7 +82,7 @@ const answer = (status, body = {}) => async (url, opts) => { answer.last = { url
   doc.ids.deleteConfirmInput.value = 'DELETE';
   ok(await h.submit() === 'blocked' && !doc.ids.deleteDialog.open && w.location.replaced === null, '409: dialog closed, nothing deleted');
   const err = doc.ids.deleteError;
-  ok(!err.hidden && text(err) === 'You have a Pro subscription that will renew. Cancel it first in Manage subscription, then delete your account.', '409: cancel-first message');
+  ok(!err.hidden && text(err) === 'You have a Pro subscription that is still active or paused. Cancel it first in Manage subscription, then delete your account.', '409: cancel-first message');
   const link = err.children.find(n => n.tagName === 'A');
   await link.fire('click');
   ok(link.href === '#billingActions' && doc.ids.manageSubscription.clicked === 1, '409: link opens Manage subscription');
@@ -149,6 +149,12 @@ const answer = (status, body = {}) => async (url, opts) => { answer.last = { url
   ok(!/Coming soon/.test(acct.slice(acct.indexOf('id="delete-title"'), acct.indexOf('</dialog>'))), 'account.html: no "Coming soon" in the delete section');
   ok(acct.includes('id="deleteAccountBtn">Delete account</button>') && acct.includes('<dialog class="confirm-dialog" id="deleteDialog"')
      && acct.includes('Type <strong>DELETE</strong> to confirm') && acct.includes('the remaining Pro time is lost'), 'account.html: button, dialog, DELETE, lost Pro time');
+
+  // ---- help pages and account page: paused must be cancelled first
+  ok(read('delete-account.html').includes('A paused subscription must be cancelled too') && !read('delete-account.html').includes('cancelled, paused or set to end'), 'delete-account.html (en): paused must be cancelled first');
+  ok(read('fr/delete-account.html').includes('Un abonnement suspendu doit aussi être résilié') && !read('fr/delete-account.html').includes('résilié, suspendu ou'), 'delete-account.html (fr): paused must be cancelled first');
+  ok(read('ar/delete-account.html').includes('يجب إلغاء الاشتراك الموقوف مؤقتًا أيضًا') && !read('ar/delete-account.html').includes('ملغًى أو موقوفًا مؤقتًا أو'), 'delete-account.html (ar): paused must be cancelled first');
+  ok(acct.includes('still active or paused, cancel it first') && read('privacy.html').includes('still active or paused, cancel it first') && read('terms.html').includes('still active or paused must be cancelled first'), 'account, privacy, terms: "active or paused"');
 
   // ---- public pages
   const pages = [['delete-account.html', 'en', ''], ['fr/delete-account.html', 'fr', '../'], ['ar/delete-account.html', 'ar', '../']];
