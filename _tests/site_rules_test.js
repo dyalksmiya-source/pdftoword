@@ -44,6 +44,10 @@ for (const code of ['PASSWORD_REQUIRED', 'PAGE_LIMIT_EXCEEDED', 'AUTH_REQUIRED',
 }
 ok(y('PAGE_LIMIT_EXCEEDED', 20) === 'This PDF has too many pages. The limit is 20 pages per file.', 'page limit message with the number');
 ok(messages('fr')('CONVERSION_FAILED') === 'Impossible de convertir ce fichier. Veuillez réessayer.', 'fr: conversion failed');
+// time budget used up (server: 413 CONVERSION_TIMEOUT)
+ok(y('CONVERSION_TIMEOUT') === 'This file took too long to convert. Try a shorter file, or split the PDF into smaller parts. This file was not counted toward your limit.', 'en: conversion timeout');
+ok(messages('fr')('CONVERSION_TIMEOUT') === 'La conversion de ce fichier a pris trop de temps. Essayez un fichier plus court, ou divisez le PDF en plusieurs parties. Ce fichier n\'a pas été décompté de votre limite.', 'fr: conversion timeout');
+ok(messages('ar')('CONVERSION_TIMEOUT') === 'استغرق تحويل هذا الملف وقتًا طويلًا. جرّب ملفًا أقصر، أو قسّم ملف PDF إلى أجزاء أصغر. لم يُحتسب هذا الملف ضمن حدك.', 'ar: conversion timeout');
 
 // ---- 2. Pro fair use message (DAILY_LIMIT_REACHED)
 ok(y('DAILY_LIMIT_REACHED', undefined, { limit: 100, retryAfter: 3 * 3600 + 20 * 60 }) ===

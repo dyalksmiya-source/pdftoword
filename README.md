@@ -51,7 +51,7 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
    `https://pdf2wordly.com` to redirect URLs.
 3. **Railway env vars** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY` (plus optional `EXTRA_CORS_ORIGINS`,
-   `OCR_LANGUAGES`, `MAX_OCR_PAGES`). No code change needed besides the frontend backend URL.
+   `OCR_LANGUAGES`, `MAX_OCR_PAGES`, `CONVERSION_TIME_BUDGET`). No code change needed besides the frontend backend URL.
 4. **Payments (Paddle)** — run `docs/sql/002_paddle_billing.sql` (WORD repo)
    first, then set `PADDLE_ENV`, `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`,
    `PADDLE_PRICE_ID` in Railway (never in files). Webhook destination:
@@ -127,9 +127,10 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
 - Sign-in (`auth.js`, used by `login.html`, `fr/login.html`, `ar/login.html` and
   `forgot-password.html`): Google first (`prompt=select_account`); email sign up
   confirmed with the 6-digit code of the "Confirm signup" email (`verifyOtp`,
-  type `signup`), resend after 60 s. Cloudflare Turnstile is prepared but OFF:
-  set `TURNSTILE_SITE_KEY` at the top of `auth.js` and put the secret key in
-  Supabase -> Authentication -> Attack Protection.
+  type `signup`), resend after 60 s. Cloudflare Turnstile is ON: the public
+  site key is `TURNSTILE_SITE_KEY` at the top of `auth.js`, the secret key is in
+  Supabase -> Authentication -> Attack Protection (set `TURNSTILE_SITE_KEY` to
+  `''` to turn it off).
 - Supabase Redirect URLs (Authentication -> URL Configuration): `https://pdf2wordly.com/`,
   `/fr/`, `/ar/` (Google returns to the page language) and `/reset-password.html`,
   `/fr/reset-password.html`, `/ar/reset-password.html` (password reset links).
@@ -153,5 +154,11 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   with `scanned_pages` and `max_scanned_pages`, and does not use the quota.
   The site shows the same number from `scanned-pages-limit` in
   `_tools/site-config.json` (keep both equal; tests check it).
+- Time budget per request: `CONVERSION_TIME_BUDGET` seconds (default 240, below
+  gunicorn's `--timeout 300` in the `Dockerfile`; tests check it). The clock
+  starts when `/api/convert` is called and is checked between pages; past it the
+  conversion stops and returns `CONVERSION_TIMEOUT` (413), deletes the temp
+  files and does not use the quota. The DOCX is written to a `.part` file and
+  renamed only when complete, so no half-written DOCX is ever sent.
 - Quality benchmark (outside this repo): `WORD/_tools/quality_bench.py`,
   results in `WORD/docs/quality/`.

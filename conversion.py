@@ -18,6 +18,12 @@
 6. At most MAX_OCR_PAGES pages are OCR'd per file (each costs 2-5 s): the
    server refuses bigger scans before converting (ScannedPageLimitError), and
    OCR fallbacks share the same budget (beyond it: placeholder line).
+7. Time budget: the server gives every request CONVERSION_TIME_BUDGET seconds
+   (default 240, below gunicorn's 300 s timeout, which would kill the worker
+   before the quota is released). The deadline is checked between pages
+   (planning, pdf2docx analysis and parsing, writing, OCR) and before saving;
+   past it, ConversionTimeoutError. The DOCX is written to a ".part" file and
+   renamed only when complete, so a stopped conversion leaves no DOCX.
 
 Logs never contain document text.
 """
@@ -25,6 +31,7 @@ import copy
 import logging
 import os
 import re
+import time
 import unicodedata
 
 import fitz  # PyMuPDF
@@ -50,6 +57,8 @@ OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+fra+ara")
 PLACEHOLDER = "[Page {n} could not be converted]"
 # Same number as "scanned-pages-limit" in _tools/site-config.json (checked by tests).
 MAX_OCR_PAGES = int(os.environ.get("MAX_OCR_PAGES", "30"))
+# Seconds per request, below gunicorn's --timeout 300 (Dockerfile; checked by tests).
+CONVERSION_TIME_BUDGET = float(os.environ.get("CONVERSION_TIME_BUDGET", "240"))
 OCR_MARGIN_PT = 56
 
 AR_RE = re.compile(r"[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
@@ -83,11 +92,54 @@ class ScannedPageLimitError(Exception):
         self.limit = limit
 
 
-def plan_pdf(pdf_path):
+class ConversionTimeoutError(Exception):
+    """The conversion used up its time budget (CONVERSION_TIME_BUDGET)."""
+
+
+def make_deadline(budget=None, start=None):
+    """time.monotonic() value after which a conversion stops."""
+    return (time.monotonic() if start is None else start) + (
+        CONVERSION_TIME_BUDGET if budget is None else budget)
+
+
+def check_deadline(deadline):
+    if deadline is not None and time.monotonic() >= deadline:
+        raise ConversionTimeoutError("time budget used up")
+
+
+class _DeadlineDoc:
+    """The fitz.Document given to pdf2docx's document analysis: the deadline
+    is checked every time it opens or iterates a page."""
+
+    def __init__(self, doc, deadline):
+        self._doc = doc
+        self._deadline = deadline
+
+    def __getitem__(self, index):
+        check_deadline(self._deadline)
+        return self._doc[index]
+
+    def __iter__(self):
+        for page in self._doc:
+            check_deadline(self._deadline)
+            yield page
+
+    def __len__(self):
+        return len(self._doc)
+
+    def __getattr__(self, name):
+        return getattr(self._doc, name)
+
+
+def plan_pdf(pdf_path, deadline=None):
     """Route of every page: [(route, info), ...] (classify_page)."""
     doc = fitz.open(pdf_path)
     try:
-        return [classify_page(page) for page in doc]
+        plan = []
+        for page in doc:
+            check_deadline(deadline)
+            plan.append(classify_page(page))
+        return plan
     finally:
         doc.close()
 
@@ -372,15 +424,22 @@ def _try_pdf2docx_page(document, conv_page, pdf_page):
     return reason
 
 
-def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=None, max_ocr_pages=None):
+def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=None, max_ocr_pages=None,
+                        deadline=None):
     """Convert; return a report {"pages": [...], "counts": {...}}.
-    Raises EmptyDocumentError, ScannedPageLimitError. `plan`: from plan_pdf()."""
+    Raises EmptyDocumentError, ScannedPageLimitError, ConversionTimeoutError.
+    `plan`: from plan_pdf(). `deadline`: from make_deadline() (None: no limit).
+    output_path exists only if the conversion finished."""
     max_ocr = MAX_OCR_PAGES if max_ocr_pages is None else max_ocr_pages
+    part_path = str(output_path) + ".part"
     doc = fitz.open(pdf_path)
     conv = None
     try:
         if plan is None:
-            plan = [classify_page(page) for page in doc]
+            plan = []
+            for page in doc:
+                check_deadline(deadline)
+                plan.append(classify_page(page))
         planned_ocr = count_ocr_pages(plan)
         if planned_ocr > max_ocr:
             raise ScannedPageLimitError(planned_ocr, max_ocr)
@@ -395,8 +454,11 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
             conv = Converter(str(pdf_path))
             settings = conv.default_settings
             settings.update({"ignore_page_error": True})
-            conv.load_pages(pages=text_ids).parse_document(**settings)
+            conv.load_pages(pages=text_ids)
+            # = conv.parse_document(), with the deadline checked page by page
+            conv.pages.parse(_DeadlineDoc(conv.fitz_doc, deadline), **settings)
             for i in text_ids:
+                check_deadline(deadline)
                 try:
                     conv.pages[i].parse(**settings)
                 except Exception as exc:
@@ -405,6 +467,7 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
         document = Document()
         report = []
         for i, page in enumerate(doc):
+            check_deadline(deadline)
             route, info = plan[i]
             entry = {"page": i + 1, "route": route, **info}
             if route == "text":
@@ -449,12 +512,20 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
         if not any(e["outcome"] in ("text", "ocr", "ocr_fallback") for e in report):
             raise EmptyDocumentError("no readable page")
 
+        check_deadline(deadline)
         fix_arabic(document)
-        document.save(output_path)
+        check_deadline(deadline)
+        document.save(part_path)
+        os.replace(part_path, output_path)        # never a half-written DOCX
     finally:
         if conv is not None:
             conv.close()
         doc.close()
+        if os.path.exists(part_path):
+            try:
+                os.remove(part_path)
+            except OSError:
+                logger.warning("Could not remove a partial DOCX")
 
     counts = {}
     for e in report:

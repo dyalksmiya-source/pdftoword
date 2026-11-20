@@ -639,5 +639,175 @@ class ScannedPageCapApi(unittest.TestCase):
         self.assertIn("قسّم الملف أو حوّل أول {max} صفحة.", js)
 
 
+# ---------------------------------------------------------------- 7. time budget
+class TimeBudget(Tmp):
+    """Past the deadline: ConversionTimeoutError, no DOCX, no .part file."""
+
+    def text_pdf(self, n=3):
+        return self.pdf(lambda d: [_text_page(d, f"Page {k} has enough plain words here.") for k in range(n)])
+
+    def leftovers(self):
+        return sorted(p.name for p in self.dir.iterdir() if p.suffix != ".pdf")
+
+    def test_deadline_helpers(self):
+        self.assertEqual(C.make_deadline(budget=10, start=100.0), 110.0)
+        C.check_deadline(None)                                   # no deadline: never stops
+        C.check_deadline(C.make_deadline(budget=60))
+        with self.assertRaises(C.ConversionTimeoutError):
+            C.check_deadline(C.make_deadline(budget=-1))
+
+    def test_expired_deadline_stops_before_anything_is_written(self):
+        pdf = self.text_pdf()
+        with mock.patch.object(pytesseract, "image_to_data") as ocr, self.assertRaises(C.ConversionTimeoutError):
+            C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"), deadline=C.make_deadline(budget=-1))
+        ocr.assert_not_called()
+        self.assertEqual(self.leftovers(), [])
+
+    def test_plan_stops_between_pages(self):
+        pdf = self.text_pdf()
+        with self.assertRaises(C.ConversionTimeoutError):
+            C.plan_pdf(str(pdf), deadline=C.make_deadline(budget=-1))
+        self.assertEqual(len(C.plan_pdf(str(pdf), deadline=C.make_deadline(budget=60))), 3)
+
+    def test_stops_inside_the_pdf2docx_analysis(self):
+        """parse_document's page loop sees the deadline (pages are not parsed one by one after it)."""
+        from pdf2docx.page.Page import Page
+        pdf = self.text_pdf()
+        plan = C.plan_pdf(str(pdf))
+        ticks = iter([0.0, 0.0])                                  # two page checks, then the time is up
+        with mock.patch.object(C.time, "monotonic", side_effect=lambda: next(ticks, 1000.0)), \
+                mock.patch.object(Page, "parse") as parse, self.assertRaises(C.ConversionTimeoutError):
+            C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"), plan=plan, deadline=100.0)
+        parse.assert_not_called()
+        self.assertEqual(self.leftovers(), [])
+
+    def test_stops_before_saving_and_leaves_no_docx(self):
+        pdf = self.text_pdf()
+        clock = [0.0]
+        real_fix = C.fix_arabic
+
+        def slow_fix(document):
+            real_fix(document)
+            clock[0] = 1000.0                                     # the time runs out during the last step
+
+        with mock.patch.object(C.time, "monotonic", side_effect=lambda: clock[0]), \
+                mock.patch.object(C, "fix_arabic", slow_fix), self.assertRaises(C.ConversionTimeoutError):
+            C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"), deadline=100.0)
+        self.assertEqual(self.leftovers(), [])
+
+    def test_failed_save_leaves_no_partial_file(self):
+        from docx.document import Document as Doc
+        pdf = self.text_pdf(1)
+
+        def half_save(self_doc, path):
+            Path(path).write_bytes(b"PK half")
+            raise OSError("disk full")
+
+        with mock.patch.object(Doc, "save", half_save), self.assertRaises(OSError):
+            C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"))
+        self.assertEqual(self.leftovers(), [])
+
+    def test_in_time_conversion_writes_only_the_docx(self):
+        pdf = self.text_pdf()
+        report = C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"), deadline=C.make_deadline(budget=120))
+        self.assertEqual(report["counts"], {"text": 3})
+        self.assertEqual(self.leftovers(), ["o.docx"])
+        self.assertIn("Page 2 has enough plain words", self.docx_text(self.dir / "o.docx"))
+
+    def test_default_budget_is_below_the_gunicorn_timeout_and_env_overrides_it(self):
+        import subprocess
+        docker = (SITE / "Dockerfile").read_text(encoding="utf-8")
+        timeout = int(re.search(r"--timeout (\d+)", docker).group(1))
+        self.assertEqual(C.CONVERSION_TIME_BUDGET, 240)
+        # room after the budget for one slow page (OCR / image-heavy pdf2docx), saving and the quota release
+        self.assertGreaterEqual(timeout - C.CONVERSION_TIME_BUDGET, 45)
+        env = dict(os.environ, CONVERSION_TIME_BUDGET="90")
+        out = subprocess.run([sys.executable, "-c", "import conversion; print(conversion.CONVERSION_TIME_BUDGET)"],
+                             cwd=str(SITE), env=env, capture_output=True, text=True)
+        self.assertEqual(out.stdout.strip().splitlines()[-1], "90.0", out.stderr)
+
+
+class TimeBudgetApi(unittest.TestCase):
+    """413 CONVERSION_TIMEOUT, clear message, quota released, temp files deleted."""
+
+    def runner(self):
+        return EmptyDocumentApi.runner(self)
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="pw-budget-"))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def run_timeout(self, pro=False, during_plan=False):
+        import contextlib
+        import json
+        r = self.runner()
+        srv = sys.modules["server"]
+        err = C.ConversionTimeoutError("x")
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(mock.patch.object(srv, "TEMP_DIR", self.tmp))
+            if during_plan:
+                stack.enter_context(mock.patch.object(srv.conversion, "plan_pdf", side_effect=err))
+            if pro:
+                code, body, calls = r.run_pro({"allowed": True, "claim_id": 5}, convert_error=err)
+            else:
+                code, body, calls = r.run_convert(r.free(), {"allowed": True, "reason": "first_conversion",
+                                                             "previous": None}, convert_error=err)
+        return code, json.loads(body), calls
+
+    def test_free_user_keeps_the_quota_and_no_file_is_left(self):
+        code, data, calls = self.run_timeout()
+        self.assertEqual(code, 413)
+        self.assertEqual(data["code"], "CONVERSION_TIMEOUT")
+        self.assertIn("took too long to convert", data["error"])
+        self.assertIn("split the PDF", data["error"])
+        self.assertIn("not counted toward your limit", data["error"])
+        self.assertEqual(calls[-1], ("release_free_conversion", {"p_user_id": mock.ANY, "p_previous": None}))
+        self.assertEqual(list(self.tmp.iterdir()), [])
+
+    def test_pro_user_keeps_the_fair_use_slot(self):
+        code, data, calls = self.run_timeout(pro=True)
+        self.assertEqual((code, data["code"]), (413, "CONVERSION_TIMEOUT"))
+        self.assertEqual(calls[-1][0], "release_pro_conversion")
+        self.assertEqual(list(self.tmp.iterdir()), [])
+
+    def test_timeout_while_planning(self):
+        code, data, calls = self.run_timeout(during_plan=True)
+        self.assertEqual((code, data["code"]), (413, "CONVERSION_TIMEOUT"))
+        self.assertEqual(calls[-1][0], "release_free_conversion")
+        self.assertEqual(list(self.tmp.iterdir()), [])
+
+    def test_the_clock_starts_with_the_request(self):
+        """The server's deadline reaches the real planning step: an expired budget stops it."""
+        import json
+        r = self.runner()
+        srv = sys.modules["server"]
+        with mock.patch.object(srv, "TEMP_DIR", self.tmp), \
+                mock.patch.object(srv.conversion, "CONVERSION_TIME_BUDGET", -1):
+            code, body, calls = r.run_convert(r.free(), {"allowed": True, "reason": "first_conversion",
+                                                         "previous": None},
+                                              convert_error=AssertionError("conversion must not start"))
+        self.assertEqual((code, json.loads(body)["code"]), (413, "CONVERSION_TIMEOUT"))
+        self.assertEqual(calls[-1][0], "release_free_conversion")
+
+    def test_log_has_no_user_or_file_details(self):
+        srv = sys.modules.get("server") or __import__("server")
+        with self.assertLogs(srv.logger, "WARNING") as logs:
+            self.run_timeout()
+        line = " ".join(logs.output)
+        import test_billing
+        self.assertIn("time budget of 240 s used up", line)
+        self.assertNotIn("doc.pdf", line)
+        self.assertNotIn(test_billing.USER, line)
+
+    def test_site_message_in_three_languages(self):
+        js = (SITE / "script.js").read_text(encoding="utf-8")
+        self.assertIn('case"CONVERSION_TIMEOUT":return pwT("This file took too long to convert. Try a shorter file, '
+                      'or split the PDF into smaller parts.")+" "+pwT("This file was not counted toward your limit.");', js)
+        self.assertIn("La conversion de ce fichier a pris trop de temps.", js)
+        self.assertIn("استغرق تحويل هذا الملف وقتًا طويلًا.", js)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -50,7 +50,7 @@ from supabase import create_client
 
 import billing
 import conversion
-from conversion import EmptyDocumentError
+from conversion import ConversionTimeoutError, EmptyDocumentError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pdf2wordly")
@@ -292,10 +292,11 @@ def check_pdf_limits(pdf_path, max_pages):
         doc.close()
 
 
-def run_conversion(input_path, output_path, plan=None):
+def run_conversion(input_path, output_path, plan=None, deadline=None):
     """Page-by-page conversion (conversion.py). Raises EmptyDocumentError when
-    nothing in the PDF is readable. Returns the per-page report."""
-    report = conversion.convert_pdf_to_docx(input_path, output_path, plan=plan)
+    nothing in the PDF is readable, ConversionTimeoutError past `deadline`.
+    Returns the per-page report."""
+    report = conversion.convert_pdf_to_docx(input_path, output_path, plan=plan, deadline=deadline)
     if not os.path.exists(output_path):
         raise RuntimeError("Conversion did not produce an output file.")
     logger.info("Converted %d pages: %s", len(report["pages"]),
@@ -448,6 +449,11 @@ def delete_account():
 
 @app.route("/api/convert", methods=["POST"])
 def convert():
+    # The time budget starts with the request: past it the conversion stops
+    # cleanly (CONVERSION_TIMEOUT, quota released) before gunicorn's 300 s
+    # timeout kills the worker.
+    deadline = conversion.make_deadline()
+
     # 1. Authenticate — the user id comes ONLY from the verified token.
     user_id, err = get_authenticated_user_id()
     if err:
@@ -605,7 +611,9 @@ def convert():
         # Scanned pages are OCR'd (2-5 s each): cap them so a request stays far
         # below the 300 s worker timeout. Checked before converting.
         try:
-            plan = conversion.plan_pdf(input_path)
+            plan = conversion.plan_pdf(input_path, deadline=deadline)
+        except ConversionTimeoutError:
+            raise
         except Exception:
             cleanup_files(input_path)
             _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
@@ -630,7 +638,7 @@ def convert():
             size = -1
         logger.info("Converting upload (%d bytes, %d pages, %d scanned)", size, len(plan), scanned_pages)
 
-        run_conversion(input_path, output_path, plan=plan)
+        run_conversion(input_path, output_path, plan=plan, deadline=deadline)
 
         # 6. SUCCESS — the Free claim / Pro fair-use slot stands (set by the
         #    atomic RPC). Stream the file, then clean up.
@@ -653,6 +661,18 @@ def convert():
                         "error": ("We couldn't find any text in this PDF. It may be blank "
                                   "or contain only images without text. This file was "
                                   "not counted toward your limit.")}), 422
+
+    except ConversionTimeoutError:
+        # Too long for one request: no DOCX (conversion.py writes it only when
+        # complete), temp files deleted, the user keeps their quota.
+        logger.warning("Conversion stopped: time budget of %d s used up",
+                       int(conversion.CONVERSION_TIME_BUDGET))
+        cleanup_files(input_path, output_path, output_path + ".part")
+        _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
+        return jsonify({"code": "CONVERSION_TIMEOUT",
+                        "error": ("This file took too long to convert. Try a shorter file, or "
+                                  "split the PDF into smaller parts. This file was not counted "
+                                  "toward your limit.")}), 413
 
     except Exception:
         # 7. FAILURE — release the claim so the user keeps their quota.
