@@ -863,6 +863,82 @@ class ScanPages(Tmp):
         self.assertIn("committee met on Monday", text)
 
 
+class UnreadablePages(Tmp):
+    """OCR confidence below 50: the page image + one italic note in the document's language, no garbage."""
+
+    GARBAGE = "Sacomful ptopte brass thot cam chomgud"
+
+    def run_with(self, build, conf=30.0):
+        pdf = self.pdf(build)
+        fake = C.OcrResult([("para", self.GARBAGE)], "eng+fra", {"conf": conf})
+        with mock.patch.object(C, "ocr_page", return_value=fake):
+            report, out = self.convert(pdf)
+        return report, out
+
+    def note_paragraphs(self, out):
+        return [p for p in Document(out).paragraphs if p.text in C.UNREADABLE_NOTE.values()]
+
+    def test_low_confidence_page_is_kept_as_image_with_a_note(self):
+        report, out = self.run_with(lambda d: (_text_page(d, "The committee met on Monday and the\n"
+                                                             "volunteers will visit the schools."),
+                                               _image_of_text(d, "handwriting")))
+        self.assertEqual([p["outcome"] for p in report["pages"]], ["text", "unreadable"])
+        text = self.docx_text(out)
+        self.assertNotIn("Sacomful", text)                                 # no garbage text
+        notes = self.note_paragraphs(out)
+        self.assertEqual([n.text for n in notes], [C.UNREADABLE_NOTE["en"]])
+        self.assertTrue(all(r.italic for r in notes[0].runs))
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(len([n for n in z.namelist() if n.startswith("word/media/")]), 1)
+        # picture and note on the same page: picture height fits the page minus the note
+        doc = Document(out)
+        section = doc.sections[-1]
+        pic = doc.inline_shapes[0]
+        self.assertLessEqual(pic.height + C.Pt(48),
+                             section.page_height - section.top_margin - section.bottom_margin + 1)
+
+    def test_note_follows_the_document_language(self):
+        _, out = self.run_with(lambda d: (_text_page(d, "La commission est réunie pour le programme\n"
+                                                        "et les inscriptions des élèves dans la ville."),
+                                          _image_of_text(d, "x")))
+        self.assertEqual([n.text for n in self.note_paragraphs(out)], [C.UNREADABLE_NOTE["fr"]])
+        self.assertEqual(C._document_language("تقدم الجمعية في هذا التقرير حصيلة أنشطتها"), "ar")
+        self.assertEqual(C._document_language("The report of the year and the plan"), "en")
+        self.assertEqual(C._document_language(""), "en")
+
+    def test_note_follows_the_page_script_when_it_is_clear(self):
+        english_ui = "Search ratings views pages Upload Sign in Download free for the days " * 5
+        arabic = "تقدم الجمعية في هذا التقرير"
+        self.assertEqual(C._note_language("ara", english_ui), "ar")             # Arabic page, English site text
+        self.assertEqual(C._note_language("eng+fra", arabic + " le programme et les élèves de la ville"), "fr")
+        self.assertEqual(C._note_language("eng+fra", arabic), "en")             # Latin page, nothing French
+        self.assertEqual(C._note_language("eng+fra+ara", arabic * 3 + " a b"), "ar")   # mixed: the document's
+        self.assertEqual(C._note_language("eng+fra+ara", english_ui), "en")
+
+    def test_arabic_note_is_right_to_left(self):
+        doc = Document()
+        note = doc.add_paragraph()
+        note.add_run(C.UNREADABLE_NOTE["ar"]).italic = True
+        C.fix_arabic(doc)
+        self.assertIsNotNone(note._p.pPr.find(W + "bidi"))
+
+    def test_document_of_only_unreadable_pages_is_still_returned(self):
+        report, out = self.run_with(lambda d: (_image_of_text(d, "a"), _image_of_text(d, "b")))
+        self.assertEqual(report["counts"], {"unreadable": 2})
+        self.assertEqual(len(self.note_paragraphs(out)), 2)
+
+    def test_confidence_at_the_threshold_keeps_the_text(self):
+        report, out = self.run_with(lambda d: (_image_of_text(d, "x"),), conf=50.0)
+        self.assertEqual(report["pages"][0]["outcome"], "ocr")
+        self.assertIn(self.GARBAGE, self.docx_text(out))
+
+    def test_log_has_no_content(self):
+        with self.assertLogs("pdf2wordly.conversion", "INFO") as logs:
+            self.run_with(lambda d: (_image_of_text(d, "x"),))
+        self.assertIn("kept as an image with a note", " ".join(logs.output))
+        self.assertNotIn("Sacomful", " ".join(logs.output))
+
+
 # ---------------------------------------------------------------- 7. time budget
 class TimeBudget(Tmp):
     """Past the deadline: ConversionTimeoutError, no DOCX, no .part file."""

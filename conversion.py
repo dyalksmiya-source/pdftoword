@@ -13,7 +13,9 @@
    "ara" only; mixed: all), the grey image read too when Tesseract is unsure
    (better result kept), a line-loss guard for text lines no word covers,
    then real paragraphs, Heading 1/2 from the text size, and Word tables
-   for clear ruled grids.
+   for clear ruled grids. A page read with a mean confidence below
+   OCR_UNREADABLE_CONF (handwriting, poor photo) is kept as its image with a
+   short italic note in the document's language, never as garbage text.
 4. Arabic: paragraphs that are mainly Arabic get w:bidi, start (right)
    alignment and RTL runs (w:rtl, complex-script font and size); Latin words
    inside them stay in LTR runs. Mainly-Arabic tables become RTL tables
@@ -60,6 +62,17 @@ OCR_MIN_CONF = 60                # confident words used to detect the script
 KEPT_IMAGE_DPI = 150             # page with no text found: kept as a picture
 OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+fra+ara")
 PLACEHOLDER = "[Page {n} could not be converted]"
+# OCR page read with a mean confidence below this (handwriting, poor photo):
+# the page image is kept, with a short note, instead of unreliable text.
+OCR_UNREADABLE_CONF = 50
+UNREADABLE_NOTE = {
+    "en": "This page could not be read reliably (handwriting or low quality), so it is kept as an image.",
+    "fr": "Cette page n'a pas pu être lue de façon fiable (écriture manuscrite ou faible qualité), "
+          "elle est donc conservée comme image.",
+    "ar": "تعذّرت قراءة هذه الصفحة بشكل موثوق (خط يدوي أو جودة منخفضة)، لذلك احتُفظ بها كصورة.",
+}
+FRENCH_WORDS = frozenset("le la les des et est une un du pour dans que qui sur avec pas par au aux ce cette sont".split())
+ENGLISH_WORDS = frozenset("the and of to is in for that with on are this be as by it an was from".split())
 # Same number as "scanned-pages-limit" in _tools/site-config.json (checked by tests).
 MAX_OCR_PAGES = int(os.environ.get("MAX_OCR_PAGES", "30"))
 # Seconds per request, below gunicorn's --timeout 300 (Dockerfile; checked by tests).
@@ -914,15 +927,48 @@ def _write_ocr(document, rect, result):
             document.add_paragraph(item[1]).paragraph_format.space_after = Pt(6)
 
 
-def _write_picture(document, page):
+def _write_picture(document, page, reserve=0):
+    """The page as a picture, fitted to the page (minus `reserve` EMU of height for a note)."""
     import io
     _start_page(document, page.rect)
     section = document.sections[-1]
     width = section.page_width - section.left_margin - section.right_margin
-    height = section.page_height - section.top_margin - section.bottom_margin
+    height = section.page_height - section.top_margin - section.bottom_margin - reserve
     scale = min(width / page.rect.width, height / page.rect.height)
     png = page.get_pixmap(dpi=KEPT_IMAGE_DPI, alpha=False).tobytes("png")
-    document.add_picture(io.BytesIO(png), width=int(page.rect.width * scale))
+    # 0.5% smaller: pixel rounding must not push the picture (or the note) to a new page
+    document.add_picture(io.BytesIO(png), width=int(page.rect.width * scale * 0.995))
+
+
+def _write_unreadable(document, page):
+    """Page image + one short italic note; the note text is set at the end, in the
+    page's language (_note_language). Returns the note paragraph."""
+    _write_picture(document, page, reserve=Pt(48))
+    note = document.add_paragraph()
+    note.add_run(UNREADABLE_NOTE["en"]).italic = True
+    return note
+
+
+def _note_language(page_langs, text, languages=OCR_LANGUAGES):
+    """Language of the note for an unreadable page: the page's own script when the
+    sample made it clear (Arabic -> "ar"; Latin -> French or English from the
+    document's words), else the document's language."""
+    if page_langs == "ara":
+        return "ar"
+    latin = "+".join(lang for lang in _configured(languages) if lang != "ara")
+    return _document_language(text, latin_only=page_langs == latin)
+
+
+def _document_language(text, latin_only=False):
+    """"ar", "fr" or "en" from the document's own text (Arabic letters, then
+    common French vs English words); English when there is nothing to go on."""
+    ar, la = len(AR_RE.findall(text)), len(LATIN_RE.findall(text))
+    if ar and ar >= la and not latin_only:
+        return "ar"
+    words = [w.lower() for w in WORD_RE.findall(text)]
+    fr = sum(1 for w in words if w in FRENCH_WORDS)
+    en = sum(1 for w in words if w in ENGLISH_WORDS)
+    return "fr" if fr > en else "en"
 
 
 def _norm_words(text):
@@ -1077,6 +1123,7 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
 
         document = Document()
         report = []
+        notes = []                                         # notes of pages kept as images
         for i, page in enumerate(doc):
             check_deadline(deadline)
             started = time.monotonic()
@@ -1108,7 +1155,12 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
                 result = ocr_page(page, languages)
                 entry["ocr_languages"] = result.langs
                 entry["ocr"] = result.info
-                if result.has_text():
+                if result.has_text() and result.info.get("conf", 100) < OCR_UNREADABLE_CONF:
+                    notes.append((_write_unreadable(document, page), result.langs))   # no unreliable text
+                    entry["outcome"] = "unreadable"
+                    logger.info("Page %d: OCR confidence %.0f, kept as an image with a note",
+                                i + 1, result.info.get("conf", 0))
+                elif result.has_text():
                     _write_ocr(document, page.rect, result)
                     entry["outcome"] = "ocr_fallback" if "fallback_reason" in entry else "ocr"
                 elif info["images"]:
@@ -1125,8 +1177,14 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
             entry["seconds"] = round(time.monotonic() - started, 2)
             report.append(entry)
 
-        if not any(e["outcome"] in ("text", "ocr", "ocr_fallback") for e in report):
+        if not any(e["outcome"] in ("text", "ocr", "ocr_fallback", "unreadable") for e in report):
             raise EmptyDocumentError("no readable page")
+        if notes:
+            body = document.element.body
+            own = set(id(n._p) for n, _ in notes)
+            text = " ".join(t.text or "" for p in body.iter(W + "p") if id(p) not in own for t in p.iter(W + "t"))
+            for note, page_langs in notes:
+                note.runs[0].text = UNREADABLE_NOTE[_note_language(page_langs, text, languages)]
 
         check_deadline(deadline)
         fix_arabic(document)
