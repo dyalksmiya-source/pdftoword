@@ -324,11 +324,13 @@ class OcrLanguages(unittest.TestCase):
         self.assertEqual(ch(500, 0, "eng+fra"), "eng+fra")           # Arabic not configured
         self.assertEqual(ch(500, 0, "ara+eng"), "ara")
 
-    def test_lines_from_data_drop_noise_words(self):
-        data = {"text": ["Hello", "world", "لا", "", "Next", "line"],
-                "block_num": [1, 1, 1, 1, 1, 2], "par_num": [1, 1, 1, 1, 1, 1], "line_num": [1, 1, 1, 1, 2, 1]}
-        lines = C._lines_from_data(data, lambda w: not C.AR_RE.search(w))
-        self.assertEqual(lines, ["Hello world", "Next", "", "line"])
+    def test_words_drop_direction_marks_and_empty_entries(self):
+        data = {"text": ["Hello‏", "", "  ", "‎world"], "conf": ["91", "-1", "-1", "88"],
+                "left": [10, 0, 0, 80], "top": [5, 0, 0, 5], "width": [60, 0, 0, 70], "height": [20, 0, 0, 20],
+                "block_num": [1, 1, 1, 1], "par_num": [1, 1, 1, 1], "line_num": [1, 1, 1, 1]}
+        words = C._words(data)
+        self.assertEqual([w["text"] for w in words], ["Hello", "world"])
+        self.assertEqual((words[1]["x0"], words[1]["x1"]), (80, 150))
 
     @needs_ocr
     @unittest.skipUnless(Path(r"C:\Windows\Fonts\arial.ttf").exists(), "Arial (Arabic glyphs) not available")
@@ -343,9 +345,9 @@ class OcrLanguages(unittest.TestCase):
         pix = page.get_pixmap(dpi=150)
         doc = fitz.open()
         doc.new_page(width=595, height=842).insert_image(fitz.Rect(0, 0, 595, 842), pixmap=pix)
-        lines, langs = C.ocr_page(doc[0])
-        self.assertEqual(langs, "ara")
-        text = " ".join(lines)
+        result = C.ocr_page(doc[0])
+        self.assertEqual(result.langs, "ara")
+        text = result.text()
         self.assertIn("الجمعية", text)
         self.assertFalse(C.LATIN_RE.search(text), text)
 
@@ -353,10 +355,11 @@ class OcrLanguages(unittest.TestCase):
     def test_latin_scan_is_ocrd_without_arabic(self):
         doc = fitz.open()
         _image_of_text(doc, "The quick brown fox jumps\nover the lazy dog again")
-        lines, langs = C.ocr_page(doc[0])
+        result = C.ocr_page(doc[0])
         doc.close()
-        self.assertEqual(langs, "eng+fra")
-        self.assertFalse(any(C.AR_RE.search(line) for line in lines))
+        self.assertEqual(result.langs, "eng+fra")
+        self.assertFalse(C.AR_RE.search(result.text()), result.text())
+        self.assertIn("quick brown fox", result.text())
 
 
 # ---------------------------------------------------------------- 3. Arabic direction
@@ -637,6 +640,227 @@ class ScannedPageCapApi(unittest.TestCase):
         self.assertIn("S=e.scanned_pages,X=e.max_scanned_pages", js)
         self.assertIn("Divisez le PDF ou convertissez les {max} premières pages.", js)
         self.assertIn("قسّم الملف أو حوّل أول {max} صفحة.", js)
+
+
+# ---------------------------------------------------------------- 8. scans: preprocessing, structure, tables
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
+
+
+def _text_image(lines, size=(1700, 2200), scale=1.2, top=200, pitch=70, left=150):
+    """White image with black text lines (cv2 Hershey font)."""
+    img = np.full((size[1], size[0]), 255, np.uint8)
+    for k, line in enumerate(lines):
+        cv2.putText(img, line, (left, top + k * pitch), cv2.FONT_HERSHEY_SIMPLEX, scale, 0, 3, cv2.LINE_AA)
+    return img
+
+
+def _grid(img, x0, y0, col_w, row_h, cols, rows, skip=None):
+    """Ruled table; skip=(r, c): no rule between cell (r, c) and (r, c + 1) (a merged cell)."""
+    for r in range(rows + 1):
+        cv2.line(img, (x0, y0 + r * row_h), (x0 + cols * col_w, y0 + r * row_h), 0, 3)
+    for c in range(cols + 1):
+        if skip and c == skip[1] + 1:
+            cv2.line(img, (x0 + c * col_w, y0), (x0 + c * col_w, y0 + skip[0] * row_h), 0, 3)
+            cv2.line(img, (x0 + c * col_w, y0 + (skip[0] + 1) * row_h), (x0 + c * col_w, y0 + rows * row_h), 0, 3)
+        else:
+            cv2.line(img, (x0 + c * col_w, y0), (x0 + c * col_w, y0 + rows * row_h), 0, 3)
+    return img
+
+
+def _line(text, x0, y0, x1, y1, key=(1, 1, 1)):
+    words = text.split()
+    step = (x1 - x0) / len(words)
+    ws = [{"text": w, "conf": 90.0, "x0": x0 + k * step, "x1": x0 + (k + 1) * step - 8, "y0": y0, "y1": y1,
+           "key": key} for k, w in enumerate(words)]
+    return C._group_lines(ws)[0]
+
+
+class ScanPreprocessing(unittest.TestCase):
+    def test_skew_is_measured_and_corrected(self):
+        img = _text_image(["Le club de lecture du quartier a reuni"] * 12)
+        for angle in (3.0, -4.5):
+            m = cv2.getRotationMatrix2D((850, 1100), angle, 1.0)
+            rotated = cv2.warpAffine(img, m, (1700, 2200), borderValue=255)
+            measured = C.skew_angle(255 - rotated)
+            self.assertAlmostEqual(measured, -angle, delta=0.4)
+            straight = C._rotate(rotated, measured)
+            self.assertAlmostEqual(C.skew_angle(255 - straight), 0.0, delta=0.3)
+
+    def test_dark_border_cut_and_lighting_flattened(self):
+        paper = _text_image(["Uneven light on yellow paper"] * 10).astype(np.float32)
+        h, w = paper.shape
+        shade = np.linspace(0.55, 1.0, w, dtype=np.float32)[None, :]          # dark on the left
+        photo = np.full((h + 300, w + 300), 70, np.float32)                     # desk
+        photo[150:150 + h, 150:150 + w] = paper * 0.9 * shade
+        gray, binary, horiz, vert, info = C.preprocess(photo.astype(np.uint8))
+        self.assertTrue(info.get("border_cut"))
+        self.assertLess(gray.shape[1], w + 300 - 200)                          # desk cut off
+        # paper is white everywhere (left and right), ink is black
+        self.assertGreater(np.percentile(gray[:, :200], 60), 230)
+        self.assertGreater(np.percentile(gray[:, -200:], 60), 230)
+        self.assertLess(binary.min(), 50)
+        self.assertGreater((binary == 255).mean(), 0.85)
+
+    def test_resolution_follows_the_scan(self):
+        for img_dpi, expected in ((100, 200), (220, 220), (600, 300)):
+            doc = fitz.open()
+            page = doc.new_page(width=595, height=842)
+            px = int(595 / 72 * img_dpi)
+            pix = fitz.Pixmap(fitz.csGRAY, fitz.IRect(0, 0, px, int(842 / 72 * img_dpi)), 0)
+            pix.set_rect(pix.irect, (255,))
+            page.insert_image(page.rect, pixmap=pix)
+            self.assertAlmostEqual(C.ocr_dpi(page), expected, delta=2)
+            doc.close()
+
+    def test_clear_grid_is_found_and_a_merged_cell_is_not_trusted(self):
+        img = _grid(np.full((1500, 1400), 255, np.uint8), 100, 200, 300, 80, 4, 5)
+        _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+        tables = C.find_tables(*C._rules(binary))
+        self.assertEqual(len(tables), 1)
+        self.assertEqual((len(tables[0]["rows"]), len(tables[0]["cols"])), (6, 5))
+        merged = _grid(np.full((1500, 1400), 255, np.uint8), 100, 200, 300, 80, 4, 5, skip=(2, 1))
+        _, binary = cv2.threshold(merged, 127, 255, cv2.THRESH_BINARY)
+        self.assertEqual(C.find_tables(*C._rules(binary)), [])
+
+    def test_rules_do_not_take_letters(self):
+        img = _text_image(["Illustration: a long title line with tall letters"], scale=3.0)
+        _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+        horiz, vert = C._rules(binary)
+        self.assertEqual(int(horiz.sum()) + int(vert.sum()), 0)
+
+    def test_layout_line_not_covered_by_words_is_found(self):
+        img = _text_image(["first line of text here", "second line of text here", "third line of text"])
+        _, binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+        boxes = sorted(C._layout_lines(binary, 30), key=lambda b: b[1])
+        self.assertEqual(len(boxes), 3)
+        words = [{"x0": b[0], "x1": b[2], "y0": b[1], "y1": b[3]} for b in (boxes[0], boxes[2])]
+        self.assertEqual([C._covered(b, words) for b in boxes], [True, False, True])
+
+
+class ScanStructure(unittest.TestCase):
+    def test_lines_become_paragraphs_and_headings(self):
+        lines = [_line("Annual report", 100, 100, 700, 160, (1, 1, 1)),
+                 _line("The first paragraph starts here and goes on", 100, 220, 1500, 250, (2, 1, 1)),
+                 _line("to the full width of the column again and", 100, 260, 1500, 290, (2, 1, 2)),
+                 _line("ends on a short line.", 100, 300, 600, 330, (2, 1, 3)),
+                 _line("A second paragraph follows the short line", 100, 340, 1500, 370, (2, 2, 1)),
+                 _line("and Tesseract cut its last line off.", 100, 380, 1490, 410, (3, 1, 1))]
+        paras = C.build_paragraphs(lines, 30)
+        self.assertEqual([p["level"] for p in paras], [1, 0, 0])
+        self.assertEqual(paras[1]["text"], "The first paragraph starts here and goes on to the full width of "
+                                           "the column again and ends on a short line.")
+        self.assertTrue(paras[2]["text"].endswith("cut its last line off."))
+
+    def test_column_change_starts_a_new_paragraph(self):
+        lines = [_line("left column text line number one", 100, 200, 700, 230, (1, 1, 1)),
+                 _line("left column text line number two", 100, 240, 700, 270, (1, 1, 2)),
+                 _line("right column text line number one", 800, 200, 1400, 230, (2, 1, 1)),
+                 _line("right column text line number two", 800, 240, 1400, 270, (2, 1, 2))]
+        paras = C.build_paragraphs(lines, 30)
+        self.assertEqual(len(paras), 2)
+        self.assertTrue(paras[1]["text"].startswith("right column"))
+
+    def test_hyphen_at_line_end(self):
+        self.assertEqual(C._join("rez-de-", "chaussée"), "rez-de-chaussée")
+        self.assertEqual(C._join("Total -", "12"), "Total - 12")
+
+    def test_number_cells(self):
+        for text, ok in (("1200", True), ("15,5 %", True), ("10 h - 12 h", False), ("Rabat", False)):
+            self.assertEqual(bool(C.NUMBER_CELL_RE.match(text)), ok, text)
+
+    def test_ocr_items_are_written_with_styles_and_tables(self):
+        result = C.OcrResult([("heading", 1, "Title"), ("para", "Body text."),
+                              ("table", [["A", "B"], ["1", "2"]]), ("heading", 2, "Part two"), ("para", "More.")],
+                             "eng+fra", {})
+        doc = Document()
+        C._write_ocr(doc, fitz.Rect(0, 0, 595, 842), result)
+        paras = [(p.style.name, p.text) for p in doc.paragraphs]
+        self.assertEqual(paras, [("Heading 1", "Title"), ("Normal", "Body text."), ("Heading 2", "Part two"),
+                                 ("Normal", "More.")])
+        self.assertEqual([[c.text for c in row.cells] for row in doc.tables[0].rows], [["A", "B"], ["1", "2"]])
+        self.assertEqual(result.text(), "Title\nBody text.\nA B\n1 2\nPart two\nMore.")
+
+
+@needs_ocr
+class ScanPages(Tmp):
+    """Whole OCR pages: phone-photo look, big heading, ruled table."""
+
+    def scan(self, build, angle=0.0, dark=False):
+        src = fitz.open()
+        page = src.new_page(width=595, height=842)
+        build(page)
+        pix = page.get_pixmap(dpi=200, colorspace=fitz.csGRAY)
+        img = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.stride)[:, :pix.width].copy()
+        src.close()
+        if dark:                                                        # yellowish, uneven, on a desk
+            shade = np.linspace(0.6, 0.95, img.shape[1], dtype=np.float32)[None, :]
+            img = (img.astype(np.float32) * shade).astype(np.uint8)
+            img = cv2.copyMakeBorder(img, 120, 120, 120, 120, cv2.BORDER_CONSTANT, value=60)
+        if angle:
+            h, w = img.shape
+            img = cv2.warpAffine(img, cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0), (w, h),
+                                 borderValue=60 if dark else 255)
+        ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 60])
+        doc = fitz.open()
+        doc.new_page(width=595, height=842).insert_image(fitz.Rect(0, 0, 595, 842), stream=jpg.tobytes())
+        path = self.dir / f"scan{len(list(self.dir.iterdir()))}.pdf"
+        doc.save(path)
+        doc.close()
+        return path
+
+    @staticmethod
+    def body(page, y=200, n=8):
+        text = ("The committee met on Monday and approved the reading programme for the next school year. "
+                "Volunteers will visit the village schools every month with new books.")
+        page.insert_textbox(fitz.Rect(72, y, 523, y + 22 * n), text * 2, fontsize=12, fontname="helv")
+
+    def test_skewed_photo_on_a_desk_is_read(self):
+        pdf = self.scan(lambda p: (p.insert_text((72, 120), "Reading programme", fontsize=26, fontname="hebo"),
+                                   self.body(p)), angle=4.0, dark=True)
+        report, out = self.convert(pdf)
+        info = report["pages"][0]["ocr"]
+        self.assertTrue(info["border_cut"])
+        self.assertAlmostEqual(abs(info["skew"]), 4.0, delta=0.6)
+        self.assertIn("seconds", report["pages"][0])
+        doc = Document(out)
+        styles = [(p.style.name, p.text) for p in doc.paragraphs if p.text.strip()]
+        self.assertEqual(styles[0], ("Heading 1", "Reading programme"))
+        body = [t for s, t in styles if s == "Normal"]
+        self.assertEqual(len(body), 1, body)                             # one paragraph, not one per line
+        self.assertIn("approved the reading programme for the next school year", body[0])
+        empty = [p for p in doc.paragraphs if not p.text.strip()]
+        self.assertLessEqual(len(empty), 1)                              # at most the section paragraph
+
+    def test_very_large_heading_is_not_lost(self):
+        pdf = self.scan(lambda p: (p.insert_text((60, 160), "BIG 2025", fontsize=110, fontname="hebo"),
+                                   self.body(p, y=260)))
+        report, out = self.convert(pdf)
+        text = self.docx_text(out)
+        self.assertIn("BIG 2025", text.replace("\n", " "))
+        self.assertIn("committee met on Monday", text)
+
+    def test_ruled_table_becomes_a_word_table(self):
+        rows = [["City", "Volunteers", "Books"], ["Rabat", "85", "1200"], ["Fes", "70", "950"], ["Tangier", "55", "700"]]
+
+        def build(page):
+            page.insert_text((72, 110), "Books by city", fontsize=22, fontname="hebo")
+            for r, row in enumerate(rows):
+                for c, cell in enumerate(row):
+                    rect = fitz.Rect(72 + c * 150, 150 + r * 34, 222 + c * 150, 184 + r * 34)
+                    page.draw_rect(rect, color=(0, 0, 0), width=1.2)
+                    page.insert_text((rect.x0 + 10, rect.y0 + 23), cell, fontsize=13, fontname="helv")
+            self.body(page, y=340, n=4)
+
+        report, out = self.convert(self.scan(build, angle=-2.0))
+        self.assertEqual(report["pages"][0]["ocr"]["tables"], 1)
+        doc = Document(out)
+        self.assertEqual(len(doc.tables), 1)
+        got = [[c.text.strip() for c in row.cells] for row in doc.tables[0].rows]
+        self.assertEqual(got, rows)
+        text = self.docx_text(out)
+        self.assertNotIn("Tangier", text)                                # table text not repeated outside
+        self.assertIn("committee met on Monday", text)
 
 
 # ---------------------------------------------------------------- 7. time budget
