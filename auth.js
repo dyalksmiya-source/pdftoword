@@ -16,8 +16,8 @@
  *   Supabase), checked here before calling Supabase (sign up, reset).
  * - Google, the reset link and the end of a reset go back to the page
  *   language (/, /fr/, /ar/).
- * - Cloudflare Turnstile: OFF while TURNSTILE_SITE_KEY is ''. Then no widget
- *   is loaded and no captchaToken is sent.
+ * - Cloudflare Turnstile: ON (TURNSTILE_SITE_KEY below). Set it to '' to turn it
+ *   off: then no widget is loaded and no captchaToken is sent.
  *
  * Texts: English keys, French and Arabic in I18N below (same shape as
  * pwI18n in script.js), chosen by <html lang>.
