@@ -4,7 +4,8 @@ A PDF → Word converter: static frontend (`index.html` / `style.css` / `script.
 served from GitHub Pages at `https://pdf2wordly.com`) plus a secure Flask
 backend (`server.py`, hosted on Railway) that authenticates via Supabase,
 enforces the Free 24h limit / Pro fair-use rule (100 files per rolling 24h) server-side, and converts
-with `pdf2docx` (OCR fallback for scanned PDFs).
+page by page in `conversion.py` (`pdf2docx` for text pages, Tesseract OCR for
+scanned pages, Arabic right-to-left post-processing).
 
 ## Architecture
 
@@ -138,6 +139,13 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   "Get Pro" or the "Pro" badge. Pro users never see a purchase button.
 - Converted files and uploads are temporary — deleted right after each
   response is sent (and on every failure path).
-- `pdf2docx` handles standard text-based PDFs well. Complex layouts,
-  scanned/image-only PDFs, and unusual fonts may convert imperfectly — that's
-  a limitation of the library, not the integration.
+- Conversion (`conversion.py`): every page is classified from its visible text
+  and image coverage: text pages go through `pdf2docx`, scanned / image pages
+  through Tesseract (Latin pages keep eng+fra, Arabic pages are re-read with
+  `ara`), all in one DOCX in page order. A page that `pdf2docx` fails or loses
+  is redone with OCR; a page with nothing readable gets
+  `[Page N could not be converted]` (logged without content). Mainly-Arabic
+  paragraphs and tables are made right-to-left. A PDF with no readable text
+  returns `EMPTY_DOCUMENT` (422) and does not use the quota.
+- Quality benchmark (outside this repo): `WORD/_tools/quality_bench.py`,
+  results in `WORD/docs/quality/`.

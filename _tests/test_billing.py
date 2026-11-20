@@ -913,7 +913,8 @@ def tiny_pdf():
 class ClaimCompat:
     server = None  # set by subclasses
 
-    def run_convert(self, profile, rpc_result=None, rpc_error=None, fail_conversion=False, filename="doc.pdf"):
+    def run_convert(self, profile, rpc_result=None, rpc_error=None, fail_conversion=False, filename="doc.pdf",
+                    convert_error=None):
         srv = self.server
         admin = mock.Mock()
         chain = mock.Mock()
@@ -936,6 +937,8 @@ class ClaimCompat:
         admin.rpc.side_effect = rpc
 
         def convert(_inp, out):
+            if convert_error is not None:
+                raise convert_error
             if fail_conversion:
                 raise RuntimeError("conversion failed")
             Path(out).write_bytes(b"PK fake docx")
@@ -1018,7 +1021,7 @@ class ClaimCompatNewServerTests(ClaimCompat, unittest.TestCase):
         self.assertEqual(calls[0][1], {"p_user_id": USER, "p_limit": 100})
 
     # ---- Pro fair use (100 per rolling 24 h) --------------------------------
-    def run_pro(self, pro_result=None, pro_error=None, fail_conversion=False):
+    def run_pro(self, pro_result=None, pro_error=None, fail_conversion=False, convert_error=None):
         srv = self.server
         admin = mock.Mock()
         chain = mock.Mock()
@@ -1041,6 +1044,8 @@ class ClaimCompatNewServerTests(ClaimCompat, unittest.TestCase):
         admin.rpc.side_effect = rpc
 
         def convert(_inp, out):
+            if convert_error is not None:
+                raise convert_error
             if fail_conversion:
                 raise RuntimeError("conversion failed")
             Path(out).write_bytes(b"PK fake docx")
@@ -1106,7 +1111,7 @@ class DockerignoreTests(unittest.TestCase):
     def test_image_contents(self):
         lines = (SITE / ".dockerignore").read_text(encoding="utf-8").splitlines()
         patterns = [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
-        for f in ("server.py", "billing.py", "requirements.txt"):
+        for f in ("server.py", "billing.py", "conversion.py", "requirements.txt"):
             self.assertFalse(docker_ignored(f, patterns), f + " must be in the image")
         for f in ("_tests/test_billing.py", "_tests/billing_js_test.js", "_tools/apply_site_config.py",
                   "billing.js", "index.html", ".env", "supabase/migrations/001_profiles_billing.sql"):

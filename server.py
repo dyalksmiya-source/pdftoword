@@ -45,14 +45,12 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 
-from pdf2docx import Converter
 import fitz  # PyMuPDF
-import pytesseract
-from PIL import Image
-from docx import Document
 from supabase import create_client
 
 import billing
+import conversion
+from conversion import EmptyDocumentError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pdf2wordly")
@@ -88,9 +86,7 @@ ALLOWED_ORIGINS = [
 ] + EXTRA_ORIGINS
 
 MAX_CONTENT_LENGTH = 25 * 1024 * 1024  # 25 MB, matches the frontend limit
-MIN_CHARS_PER_PAGE = 20
-OCR_ZOOM = 2.0
-OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+fra+ara")
+# Conversion settings (page routing, OCR zoom, OCR_LANGUAGES env) live in conversion.py.
 
 # Max pages per request, checked before conversion.
 FREE_MAX_PAGES = 20
@@ -296,56 +292,15 @@ def check_pdf_limits(pdf_path, max_pages):
         doc.close()
 
 
-def pdf_is_scanned(pdf_path):
-    doc = fitz.open(pdf_path)
-    try:
-        if doc.page_count == 0:
-            return False
-        low_text_pages = 0
-        for page in doc:
-            text = page.get_text().strip()
-            if len(text) < MIN_CHARS_PER_PAGE:
-                low_text_pages += 1
-        return (low_text_pages / doc.page_count) >= 0.6
-    finally:
-        doc.close()
-
-
-def ocr_pdf_to_docx(pdf_path, output_path):
-    doc = fitz.open(pdf_path)
-    document = Document()
-    try:
-        matrix = fitz.Matrix(OCR_ZOOM, OCR_ZOOM)
-        for i, page in enumerate(doc):
-            pix = page.get_pixmap(matrix=matrix)
-            img_path = str(pdf_path) + f".page{i}.png"
-            pix.save(img_path)
-            try:
-                with Image.open(img_path) as img:
-                    text = pytesseract.image_to_string(img, lang=OCR_LANGUAGES)
-            finally:
-                cleanup_files(img_path)
-            if i > 0:
-                document.add_page_break()
-            for line in text.splitlines():
-                document.add_paragraph(line)
-    finally:
-        doc.close()
-    document.save(output_path)
-
-
 def run_conversion(input_path, output_path):
-    if pdf_is_scanned(input_path):
-        logger.info("Detected scanned/image-only PDF, using OCR path")
-        ocr_pdf_to_docx(input_path, output_path)
-    else:
-        converter = Converter(str(input_path))
-        try:
-            converter.convert(str(output_path))
-        finally:
-            converter.close()
+    """Page-by-page conversion (conversion.py). Raises EmptyDocumentError when
+    nothing in the PDF is readable. Returns the per-page report."""
+    report = conversion.convert_pdf_to_docx(input_path, output_path)
     if not os.path.exists(output_path):
         raise RuntimeError("Conversion did not produce an output file.")
+    logger.info("Converted %d pages: %s", len(report["pages"]),
+                ", ".join(f"{k}={v}" for k, v in sorted(report["counts"].items())))
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -665,6 +620,17 @@ def convert():
         )
         response.call_on_close(lambda: cleanup_files(input_path, output_path))
         return response
+
+    except EmptyDocumentError:
+        # Nothing readable (blank pages, or images without any text): no
+        # empty DOCX, and the user keeps their quota.
+        logger.info("Empty document: nothing readable")
+        cleanup_files(input_path, output_path)
+        _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
+        return jsonify({"code": "EMPTY_DOCUMENT",
+                        "error": ("We couldn't find any text in this PDF. It may be blank "
+                                  "or contain only images without text. This file was "
+                                  "not counted toward your limit.")}), 422
 
     except Exception:
         # 7. FAILURE — release the claim so the user keeps their quota.
