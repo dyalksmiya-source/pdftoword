@@ -5,5 +5,6 @@
   "pro-price": "$4.99",
   "pro-daily-limit": "100",
   "refund-days": "14",
-  "reply-time": "within 2 business days"
+  "reply-time": "within 2 business days",
+  "scanned-pages-limit": "30"
 }

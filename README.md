@@ -51,7 +51,7 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
    `https://pdf2wordly.com` to redirect URLs.
 3. **Railway env vars** — `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY` (plus optional `EXTRA_CORS_ORIGINS`,
-   `OCR_LANGUAGES`). No code change needed besides the frontend backend URL.
+   `OCR_LANGUAGES`, `MAX_OCR_PAGES`). No code change needed besides the frontend backend URL.
 4. **Payments (Paddle)** — run `docs/sql/002_paddle_billing.sql` (WORD repo)
    first, then set `PADDLE_ENV`, `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`,
    `PADDLE_PRICE_ID` in Railway (never in files). Webhook destination:
@@ -147,5 +147,11 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   `[Page N could not be converted]` (logged without content). Mainly-Arabic
   paragraphs and tables are made right-to-left. A PDF with no readable text
   returns `EMPTY_DOCUMENT` (422) and does not use the quota.
+- Scanned pages per file: at most `MAX_OCR_PAGES` (default 30, Free and Pro;
+  OCR costs 2–5 s per page and the worker timeout is 300 s). Counted after
+  page routing, before converting: more returns `SCANNED_PAGE_LIMIT` (413)
+  with `scanned_pages` and `max_scanned_pages`, and does not use the quota.
+  The site shows the same number from `scanned-pages-limit` in
+  `_tools/site-config.json` (keep both equal; tests check it).
 - Quality benchmark (outside this repo): `WORD/_tools/quality_bench.py`,
   results in `WORD/docs/quality/`.

@@ -936,7 +936,7 @@ class ClaimCompat:
 
         admin.rpc.side_effect = rpc
 
-        def convert(_inp, out):
+        def convert(_inp, out, **_kw):
             if convert_error is not None:
                 raise convert_error
             if fail_conversion:
@@ -1043,7 +1043,7 @@ class ClaimCompatNewServerTests(ClaimCompat, unittest.TestCase):
 
         admin.rpc.side_effect = rpc
 
-        def convert(_inp, out):
+        def convert(_inp, out, **_kw):
             if convert_error is not None:
                 raise convert_error
             if fail_conversion:

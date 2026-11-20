@@ -15,6 +15,9 @@
    inside them stay in LTR runs. Mainly-Arabic tables become RTL tables
    (w:bidiVisual). Arabic presentation forms are normalized to letters.
 5. A PDF with nothing readable raises EmptyDocumentError.
+6. At most MAX_OCR_PAGES pages are OCR'd per file (each costs 2-5 s): the
+   server refuses bigger scans before converting (ScannedPageLimitError), and
+   OCR fallbacks share the same budget (beyond it: placeholder line).
 
 Logs never contain document text.
 """
@@ -45,6 +48,8 @@ OCR_MIN_CONF = 60                # confident words used to detect the script
 KEPT_IMAGE_DPI = 150             # page with no text found: kept as a picture
 OCR_LANGUAGES = os.environ.get("OCR_LANGUAGES", "eng+fra+ara")
 PLACEHOLDER = "[Page {n} could not be converted]"
+# Same number as "scanned-pages-limit" in _tools/site-config.json (checked by tests).
+MAX_OCR_PAGES = int(os.environ.get("MAX_OCR_PAGES", "30"))
 OCR_MARGIN_PT = 56
 
 AR_RE = re.compile(r"[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
@@ -67,6 +72,28 @@ RUNS_XPATH = "./w:r | ./w:hyperlink/w:r | ./w:ins/w:r | ./w:smartTag/w:r"  # a p
 
 class EmptyDocumentError(Exception):
     """Nothing readable in the PDF (no text layer, no OCR text, no images)."""
+
+
+class ScannedPageLimitError(Exception):
+    """More pages need OCR than MAX_OCR_PAGES."""
+
+    def __init__(self, scanned_pages, limit):
+        super().__init__(f"{scanned_pages} scanned pages, limit {limit}")
+        self.scanned_pages = scanned_pages
+        self.limit = limit
+
+
+def plan_pdf(pdf_path):
+    """Route of every page: [(route, info), ...] (classify_page)."""
+    doc = fitz.open(pdf_path)
+    try:
+        return [classify_page(page) for page in doc]
+    finally:
+        doc.close()
+
+
+def count_ocr_pages(plan):
+    return sum(1 for route, _ in plan if route == "ocr")
 
 
 # ---------------------------------------------------------------------------
@@ -345,12 +372,19 @@ def _try_pdf2docx_page(document, conv_page, pdf_page):
     return reason
 
 
-def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES):
-    """Convert; return a report {"pages": [...], "counts": {...}}. Raises EmptyDocumentError."""
+def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=None, max_ocr_pages=None):
+    """Convert; return a report {"pages": [...], "counts": {...}}.
+    Raises EmptyDocumentError, ScannedPageLimitError. `plan`: from plan_pdf()."""
+    max_ocr = MAX_OCR_PAGES if max_ocr_pages is None else max_ocr_pages
     doc = fitz.open(pdf_path)
     conv = None
     try:
-        plan = [classify_page(page) for page in doc]
+        if plan is None:
+            plan = [classify_page(page) for page in doc]
+        planned_ocr = count_ocr_pages(plan)
+        if planned_ocr > max_ocr:
+            raise ScannedPageLimitError(planned_ocr, max_ocr)
+        ocr_budget = max_ocr - planned_ocr                 # left for pdf2docx fallbacks
         if not plan or all(route == "blank" for route, _ in plan):
             raise EmptyDocumentError("no text, images or drawings")
 
@@ -383,8 +417,15 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES):
                     entry["outcome"] = "text"
                     report.append(entry)
                     continue
-                logger.warning("Page %d: pdf2docx failed (%s), using OCR", i + 1, reason)
                 entry["fallback_reason"] = reason
+                if ocr_budget <= 0:
+                    _write_lines(document, page.rect, [PLACEHOLDER.format(n=i + 1)])
+                    entry["outcome"] = "placeholder"
+                    logger.warning("Page %d: pdf2docx failed (%s), OCR page budget used up", i + 1, reason)
+                    report.append(entry)
+                    continue
+                ocr_budget -= 1
+                logger.warning("Page %d: pdf2docx failed (%s), using OCR", i + 1, reason)
                 route = "ocr"
             if route == "ocr":
                 lines, langs = ocr_page(page, languages)

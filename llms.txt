@@ -3,7 +3,7 @@
 > PDF2Wordly (https://pdf2wordly.com/) is a free online tool that converts PDF
 > files into editable Word (.docx) documents. Free accounts convert with a
 > daily limit and a 25 MB per-file limit. Pro ($4.99/month) allows up to 100
-> files per day and up to 200 pages per file; the 25 MB per-file limit is the same on every plan. No software installation required; works in
+> files per day and up to 200 pages per file (scanned PDFs: up to 30); the 25 MB per-file limit is the same on every plan. No software installation required; works in
 > any modern desktop or mobile browser. Files are sent over an encrypted
 > connection, are never made public, and temporary files are deleted
 > automatically after conversion.

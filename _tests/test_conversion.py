@@ -520,5 +520,124 @@ class ArabicDirection(unittest.TestCase):
         self.assertFalse(C.mainly_arabic("1200"))
 
 
+
+# ---------------------------------------------------------------- scanned page cap
+class ScannedPageCap(Tmp):
+    def scans(self, n, text_pages=0):
+        def build(d):
+            for k in range(text_pages):
+                _text_page(d, f"Text page {k} with enough words.")
+            for k in range(n):
+                _image_of_text(d, f"Scan {k}")
+        return self.pdf(build)
+
+    def test_plan_counts_scanned_pages(self):
+        plan = C.plan_pdf(str(self.scans(3, text_pages=2)))
+        self.assertEqual(len(plan), 5)
+        self.assertEqual(C.count_ocr_pages(plan), 3)
+
+    def test_conversion_refuses_more_scanned_pages_than_the_cap_without_ocr(self):
+        pdf = self.scans(3)
+        with mock.patch.object(pytesseract, "image_to_data") as ocr, self.assertRaises(C.ScannedPageLimitError) as cm:
+            C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"), max_ocr_pages=2)
+        self.assertEqual((cm.exception.scanned_pages, cm.exception.limit), (3, 2))
+        ocr.assert_not_called()
+        self.assertFalse((self.dir / "o.docx").exists())
+
+    def test_fallback_ocr_shares_the_budget(self):
+        from pdf2docx.page.Page import Page
+        pdf = self.pdf(lambda d: (_text_page(d, "First page alpha words here."),
+                                  _text_page(d, "Second page beta words here.")))
+
+        def fails(page, doc):
+            raise IndexError("x")
+
+        with mock.patch.object(Page, "make_docx", fails), mock.patch.object(pytesseract, "image_to_data") as ocr,                 self.assertLogs("pdf2wordly.conversion", "WARNING") as logs:
+            with self.assertRaises(C.EmptyDocumentError):        # budget 0: both pages placeholders
+                C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"), max_ocr_pages=0)
+        ocr.assert_not_called()
+        self.assertIn("OCR page budget used up", " ".join(logs.output))
+
+    @needs_ocr
+    def test_fallback_beyond_the_budget_gets_a_placeholder(self):
+        from pdf2docx.page.Page import Page
+        original = Page.make_docx
+        pdf = self.pdf(lambda d: (_text_page(d, "First page alpha words here."),
+                                  _text_page(d, "Second page beta words here."),
+                                  _text_page(d, "Third page gamma words here.")))
+
+        def fails(page, doc):
+            if page.id in (1, 2):
+                raise IndexError("x")
+            original(page, doc)
+
+        with mock.patch.object(Page, "make_docx", fails):
+            report = C.convert_pdf_to_docx(str(pdf), str(self.dir / "o.docx"), max_ocr_pages=1)
+        self.assertEqual([p["outcome"] for p in report["pages"]], ["text", "ocr_fallback", "placeholder"])
+        self.assertIn("[Page 3 could not be converted]", self.docx_text(self.dir / "o.docx"))
+
+    def test_default_cap_is_the_site_config_number_and_env_overrides_it(self):
+        import json
+        import subprocess
+        cfg = json.loads((SITE / "_tools" / "site-config.json").read_text(encoding="utf-8"))
+        self.assertEqual(str(C.MAX_OCR_PAGES), cfg["scanned-pages-limit"])
+        env = dict(os.environ, MAX_OCR_PAGES="7")
+        out = subprocess.run([sys.executable, "-c", "import conversion; print(conversion.MAX_OCR_PAGES)"],
+                             cwd=str(SITE), env=env, capture_output=True, text=True)
+        self.assertEqual(out.stdout.strip().splitlines()[-1], "7", out.stderr)   # PyMuPDF may print a notice first
+
+
+class ScannedPageCapApi(unittest.TestCase):
+    """413 SCANNED_PAGE_LIMIT before converting; numbers in the answer; quota released."""
+
+    def runner(self):
+        return EmptyDocumentApi.runner(self)
+
+    def run_with_plan(self, plan, pro=False):
+        import json
+        r = self.runner()
+        srv = sys.modules["server"]
+        with mock.patch.object(srv.conversion, "plan_pdf", return_value=plan),                 mock.patch.object(srv.conversion, "MAX_OCR_PAGES", 30):
+            if pro:
+                code, body, calls = r.run_pro({"allowed": True, "claim_id": 9})
+            else:
+                code, body, calls = r.run_convert(r.free(), {"allowed": True, "reason": "first_conversion",
+                                                             "previous": None})
+        return code, (json.loads(body) if code != 200 else None), calls
+
+    def test_pro_scan_over_the_cap_is_refused_and_the_slot_released(self):
+        code, data, calls = self.run_with_plan([("ocr", {})] * 31, pro=True)
+        self.assertEqual(code, 413)
+        self.assertEqual(data["code"], "SCANNED_PAGE_LIMIT")
+        self.assertEqual((data["scanned_pages"], data["max_scanned_pages"]), (31, 30))
+        self.assertIn("Split the PDF or convert the first 30 pages", data["error"])
+        self.assertEqual(calls[-1][0], "release_pro_conversion")
+
+    def test_free_claim_released(self):
+        code, data, calls = self.run_with_plan([("ocr", {})] * 31)
+        self.assertEqual(code, 413)
+        self.assertEqual(calls[-1][0], "release_free_conversion")
+
+    def test_conversion_not_started(self):
+        r = self.runner()
+        srv = sys.modules["server"]
+        with mock.patch.object(srv.conversion, "plan_pdf", return_value=[("ocr", {})] * 31):
+            # a started conversion would raise here and answer 500
+            code, _, _ = r.run_pro({"allowed": True, "claim_id": 9},
+                                   convert_error=AssertionError("conversion must not start"))
+        self.assertEqual(code, 413)
+
+    def test_exactly_the_cap_and_text_pages_are_accepted(self):
+        code, _, _ = self.run_with_plan([("text", {})] * 170 + [("ocr", {})] * 30, pro=True)
+        self.assertEqual(code, 200)
+
+    def test_site_message_in_three_languages(self):
+        js = (SITE / "script.js").read_text(encoding="utf-8")
+        self.assertIn('case"SCANNED_PAGE_LIMIT":return pwScannedMsg(x);', js)
+        self.assertIn("S=e.scanned_pages,X=e.max_scanned_pages", js)
+        self.assertIn("Divisez le PDF ou convertissez les {max} premières pages.", js)
+        self.assertIn("قسّم الملف أو حوّل أول {max} صفحة.", js)
+
+
 if __name__ == "__main__":
     unittest.main()

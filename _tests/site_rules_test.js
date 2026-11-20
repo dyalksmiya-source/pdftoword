@@ -53,7 +53,7 @@ ok(messages('fr')('DAILY_LIMIT_REACHED', undefined, { limit: 100, retryAfter: 90
    'Vous avez atteint la limite d’usage raisonnable de 100 fichiers sur 24 heures. Réessayez dans 0 h 2 min.', 'fr: fair-use limit');
 ok(messages('ar')('DAILY_LIMIT_REACHED', undefined, { limit: 100, retryAfter: 3600 }) ===
    'لقد بلغت حد الاستخدام العادل البالغ 100 ملف خلال 24 ساعة. حاول مرة أخرى بعد 1 س 0 د.', 'ar: fair-use limit');
-ok(/L=e\.limit/.test(src) && /limit:L\}/.test(src) && /y\(t,e&&e\.maxPages,e\)/.test(src), 'script.js passes limit and retry time from the 429 answer');
+ok(/L=e\.limit/.test(src) && /limit:L[,}]/.test(src) &&/y\(t,e&&e\.maxPages,e\)/.test(src), 'script.js passes limit and retry time from the 429 answer');
 
 // ---- 3. one number in one place: site-config "pro-daily-limit"
 const cfg = JSON.parse(read('_tools/site-config.json'));
@@ -67,9 +67,37 @@ for (const [f, li, faq, ld] of [
   ['ar/index.html', `<li>حتى ${span} ملف يوميًا</li>`, `وباقة Pro تتيح حتى ${span} ملف يوميًا.</p>`, `وباقة Pro تتيح حتى ${N} ملف يوميًا."`]]) {
   const s = read(f);
   const card = s.slice(s.indexOf('price-card-featured'), s.indexOf('id="proCta"'));
-  ok(card.includes(li) && (card.match(/<li>/g) || []).length === 4, `${f}: pricing card "${li.replace(/<[^>]+>/g, '')}" (4 items, no separate fair-use line)`);
+  ok(card.includes(li) && (card.match(/<li>/g) || []).length === 5, `${f}: pricing card "${li.replace(/<[^>]+>/g, '')}" (5 items incl. scanned limit, no separate fair-use line)`);
   ok(s.includes(faq), `${f}: FAQ answer`);
   ok(s.includes(ld), `${f}: FAQ structured data says the same number (${N})`);
+}
+
+// ---- 4. scanned PDFs: one number in one place, site-config "scanned-pages-limit"
+const S = cfg['scanned-pages-limit'];
+ok(S === '30', 'site-config scanned-pages-limit = 30');
+ok(read('conversion.py').includes(`MAX_OCR_PAGES = int(os.environ.get("MAX_OCR_PAGES", "${S}"))`), 'conversion.py default cap = site-config number');
+ok(read('script.js').includes(`m=Number(x&&x.maxScanned)||${S};`), 'script.js fallback cap = site-config number');
+const sspan = `<span data-config="scanned-pages-limit">${S}</span>`;
+for (const [f, li, faq, ld] of [
+  ['index.html', `<li>Scanned PDFs: up to ${sspan} pages per file</li>`, `Scanned PDFs (read with OCR) can have up to ${sspan} pages per file on every plan.</p>`, `Scanned PDFs (read with OCR) can have up to ${S} pages per file on every plan."`],
+  ['fr/index.html', `<li>PDF scannés : jusqu'à ${sspan} pages par fichier</li>`, `Les PDF scannés (lus par OCR) peuvent compter jusqu'à ${sspan} pages par fichier, quelle que soit la formule.</p>`, `Les PDF scannés (lus par OCR) peuvent compter jusqu'à ${S} pages par fichier, quelle que soit la formule."`],
+  ['ar/index.html', `<li>ملفات PDF الممسوحة ضوئيًا: حتى ${sspan} صفحة لكل ملف</li>`, `فالحد الأقصى لها ${sspan} صفحة لكل ملف في جميع الخطط.</p>`, `فالحد الأقصى لها ${S} صفحة لكل ملف في جميع الخطط."`]]) {
+  const s = read(f);
+  const card = s.slice(s.indexOf('price-card-featured'), s.indexOf('id="proCta"'));
+  ok(card.includes(li), `${f}: pricing card says the scanned limit next to 200 pages`);
+  ok(s.includes(faq), `${f}: FAQ answer says the scanned limit`);
+  ok(s.includes(ld), `${f}: FAQ structured data says the same scanned limit (${S})`);
+}
+ok(read('terms.html').includes(`<li>Scanned PDFs: up to ${sspan} pages per file</li>`), 'terms.html: scanned limit');
+ok(read('scanned-pdf-to-word.html').includes(`up to ${sspan} scanned pages`) &&
+   read('scanned-pdf-to-word.html').includes(`Scanned PDFs can have up to ${S} pages per file." }`), 'scanned-pdf-to-word.html: hint + FAQ (visible and structured data)');
+for (const f of ['about.html', 'convert-multiple-pdf-files-to-word.html', 'how-to-convert-pdf-to-word.html',
+                 'pdf-to-word-alternative-to-ilovepdf.html', 'pdf-to-word-vs-smallpdf.html', 'llms.txt']) {
+  const s = read(f);
+  const all = (s.match(/up to 200 pages per file/g) || []).length;
+  const withScan = s.split(`up to 200 pages per file (scanned PDFs: up to ${S})`).length - 1
+                 + s.split(`up to 200 pages per file (scanned PDFs: up to ${sspan})`).length - 1;
+  ok(all > 0 && all === withScan, `${f}: every "up to 200 pages per file" also gives the scanned limit (${withScan}/${all})`);
 }
 
 // ---- no page promises unlimited use

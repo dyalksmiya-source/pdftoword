@@ -292,10 +292,10 @@ def check_pdf_limits(pdf_path, max_pages):
         doc.close()
 
 
-def run_conversion(input_path, output_path):
+def run_conversion(input_path, output_path, plan=None):
     """Page-by-page conversion (conversion.py). Raises EmptyDocumentError when
     nothing in the PDF is readable. Returns the per-page report."""
-    report = conversion.convert_pdf_to_docx(input_path, output_path)
+    report = conversion.convert_pdf_to_docx(input_path, output_path, plan=plan)
     if not os.path.exists(output_path):
         raise RuntimeError("Conversion did not produce an output file.")
     logger.info("Converted %d pages: %s", len(report["pages"]),
@@ -602,13 +602,35 @@ def convert():
                            **reject_extra}
             return jsonify(payload), 400
 
+        # Scanned pages are OCR'd (2-5 s each): cap them so a request stays far
+        # below the 300 s worker timeout. Checked before converting.
+        try:
+            plan = conversion.plan_pdf(input_path)
+        except Exception:
+            cleanup_files(input_path)
+            _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
+            return jsonify({"code": "CONVERSION_FAILED",
+                            "error": "We couldn't read this PDF. Please try another file."}), 400
+        scanned_pages = conversion.count_ocr_pages(plan)
+        if scanned_pages > conversion.MAX_OCR_PAGES:
+            cleanup_files(input_path)
+            _release_all(admin, user_id, claimed, claim_prev, pro_claim_id)
+            logger.info("Scanned page limit: %d scanned pages", scanned_pages)
+            return jsonify({"code": "SCANNED_PAGE_LIMIT",
+                            "error": (f"This PDF has {scanned_pages} scanned pages. Scanned PDFs can "
+                                      f"have up to {conversion.MAX_OCR_PAGES} pages per file. Split the "
+                                      f"PDF or convert the first {conversion.MAX_OCR_PAGES} pages. This "
+                                      "file was not counted toward your limit."),
+                            "scanned_pages": scanned_pages,
+                            "max_scanned_pages": conversion.MAX_OCR_PAGES}), 413
+
         try:
             size = os.path.getsize(input_path)
         except OSError:
             size = -1
-        logger.info("Converting upload (%d bytes)", size)
+        logger.info("Converting upload (%d bytes, %d pages, %d scanned)", size, len(plan), scanned_pages)
 
-        run_conversion(input_path, output_path)
+        run_conversion(input_path, output_path, plan=plan)
 
         # 6. SUCCESS — the Free claim / Pro fair-use slot stands (set by the
         #    atomic RPC). Stream the file, then clean up.
