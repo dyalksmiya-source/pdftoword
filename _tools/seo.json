@@ -179,6 +179,7 @@
     "ar/login.html": {"lang": "ar", "index": false, "title": "تسجيل الدخول أو إنشاء حساب – PDF2Wordly", "description": "سجّل الدخول أو أنشئ حسابًا مجانيًا في PDF2Wordly لتحويل ملفات PDF إلى مستندات Word."},
     "ar/forgot-password.html": {"lang": "ar", "index": false, "title": "نسيت كلمة المرور – PDF2Wordly", "description": "أعد تعيين كلمة مرور حسابك في PDF2Wordly."},
     "ar/reset-password.html": {"lang": "ar", "index": false, "title": "إعادة تعيين كلمة المرور – PDF2Wordly", "description": "عيّن كلمة مرور جديدة لحسابك في PDF2Wordly."},
+    "app-captcha.html": {"lang": "en", "index": false, "title": "Security check – PDF2Wordly", "description": "Security check used by the PDF2Wordly Android app before e-mail sign-in."},
     "404.html": {"lang": "en", "index": false, "title": "Page not found | PDF2Wordly", "description": "This page doesn't exist. Convert PDF to Word, read our guides, or go to the French or Arabic site."}
   }
 }
