@@ -11,3 +11,5 @@ Pillow==10.*
 python-docx==1.*
 supabase==2.*
 requests==2.*
+# AdMob SSV signature check (ads.py). Also pulled in by supabase-auth -> pyjwt[crypto]; pinned here.
+cryptography==50.0.1

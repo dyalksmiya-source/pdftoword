@@ -88,7 +88,7 @@ class FakeAdStore:
         now = self.clock()
         for r in self.rows:      # self-heal: claimed by a job that was never created
             if (r["user_id"] == user_id and r["consumed_at"] is not None and r["consumed_at"] < now - 900
-                    and r["job_id"] not in self.job_store.rows):
+                    and r["consumed_at"] > now - 86400 and r["job_id"] not in self.job_store.rows):
                 self._give(r)
         if max_per_day and len(self._used(user_id)) >= max_per_day:
             return {"allowed": False, "reason": "cap"}
@@ -486,6 +486,17 @@ class AdsApiTests(TempJobsDir):
         self.ads.rows[0]["consumed_at"] -= 901
         self.assertEqual(self.post_pdf().status_code, 202)
 
+    def test_old_used_reward_never_comes_back_when_its_job_row_is_gone(self):
+        self.watch_ad()
+        job = self.post_pdf().get_json()["job_id"]
+        self.store.rows[job]["status"] = "done"
+        jobs.write_state(job, status="done")
+        self.ads.rows[0]["consumed_at"] -= 86400 + 1                  # used more than 24 h ago
+        del self.store.rows[job]                                      # old conversion_jobs row cleaned
+        self.assertEqual(self.post_pdf().status_code, 429)
+        self.assertEqual(self.ads.rows[0]["job_id"], job)
+        self.assertEqual(self.ads.rows[0]["times_returned"], 0)
+
     def test_hidden_daily_cap(self):
         with mock.patch.dict(os.environ, {"ADS_MAX_REWARDS_PER_DAY": "1"}):
             self.watch_ad()
@@ -551,6 +562,7 @@ class FileTests(unittest.TestCase):
                        "revoke all on table public.ad_rewards from public, anon, authenticated",
                        "transaction_id  text not null unique", "token_nonce     text not null unique",
                        "when (old.quota_released_at is null and new.quota_released_at is not null)",
+                       "and a.consumed_at > now() - interval '24 hours'",
                        "begin;", "commit;"):
             self.assertIn(needed, code)
         for fn in ("claim_ad_reward(uuid, text, integer)", "return_ad_reward(text)",
