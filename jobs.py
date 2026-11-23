@@ -62,9 +62,28 @@ ID_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 # ---------------------------------------------------------------------------
 # Ids, files
 # ---------------------------------------------------------------------------
+INSTANCE_TAG_LEN = 6
+
+
+def instance_tag():
+    """6 characters naming this container (hostname + Railway deployment / replica). During a
+    redeploy Railway runs the old and the new container for a short time, both on the same
+    Supabase table: each one only ends the jobs it created (their files are on its own disk)."""
+    import socket
+    raw = "|".join((socket.gethostname(), os.environ.get("RAILWAY_DEPLOYMENT_ID", ""),
+                    os.environ.get("RAILWAY_REPLICA_ID", "")))
+    digest = hashlib.sha256(raw.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii")[:INSTANCE_TAG_LEN]
+
+
 def new_job_id():
-    """43 random URL-safe characters (256 bits)."""
-    return secrets.token_urlsafe(32)
+    """43 URL-safe characters: this container's tag (6) + 37 random characters (222 bits)."""
+    return instance_tag() + secrets.token_urlsafe(28)[:43 - INSTANCE_TAG_LEN]
+
+
+def is_own(job_id):
+    """Was this job created by this container?"""
+    return isinstance(job_id, str) and job_id.startswith(instance_tag())
 
 
 def valid_id(job_id):
@@ -409,11 +428,14 @@ def expire_done_job(store, job_id, downloaded, base=None):
 def sweep(store, now=None, startup=False, base=None, running_here=()):
     """Ends every job that can no longer finish and releases its quota once.
 
-    - queued for longer than JOB_QUEUE_TIMEOUT, or whose upload is gone -> failed;
-    - running: at startup (this runner runs nothing yet) or without a heartbeat for
-      JOB_STALE_AFTER -> failed (CONVERSION_INTERRUPTED), unless this runner runs it;
+    - queued for longer than JOB_QUEUE_TIMEOUT -> failed (QUEUE_TIMEOUT); a job of THIS container
+      whose upload is gone -> failed (CONVERSION_INTERRUPTED);
+    - running without a heartbeat for JOB_STALE_AFTER -> failed (CONVERSION_INTERRUPTED); at startup
+      also every running job of THIS container (its runner restarted), unless this runner runs it;
     - done past expires_at, or whose DOCX is gone (Serverless sleep / redeploy wiped the disk)
       -> expired; quota released if it was never downloaded.
+    Queued / running jobs of ANOTHER container (redeploy overlap: the old one still runs them,
+    and on SIGTERM it ends them itself) are only ended by the two time limits.
     Returns the number of jobs ended."""
     now = now or datetime.now(timezone.utc)
     ended = 0
@@ -423,20 +445,21 @@ def sweep(store, now=None, startup=False, base=None, running_here=()):
             continue
         status = row.get("status")
         p = paths(job_id, base)
+        own = is_own(job_id)
         try:
             if status == "queued":
                 created = parse_time(row.get("created_at")) or now
-                if not p["pdf"].exists():
-                    fail_job(store, job_id, "CONVERSION_INTERRUPTED", base)
-                    ended += 1
-                elif (now - created).total_seconds() > JOB_QUEUE_TIMEOUT:
+                if (now - created).total_seconds() > JOB_QUEUE_TIMEOUT:
                     fail_job(store, job_id, "QUEUE_TIMEOUT", base)
+                    ended += 1
+                elif own and not p["pdf"].exists():
+                    fail_job(store, job_id, "CONVERSION_INTERRUPTED", base)
                     ended += 1
             elif status == "running":
                 if job_id in running_here:
                     continue
                 beat = parse_time(row.get("heartbeat_at")) or parse_time(row.get("started_at")) or now
-                if startup or (now - beat).total_seconds() > JOB_STALE_AFTER:
+                if (startup and own) or (now - beat).total_seconds() > JOB_STALE_AFTER:
                     fail_job(store, job_id, "CONVERSION_INTERRUPTED", base)
                     ended += 1
             elif status == "done":

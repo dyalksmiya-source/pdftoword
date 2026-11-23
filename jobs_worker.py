@@ -231,6 +231,8 @@ class Runner:
             logger.error("Could not end a job (%s); retrying", type(exc).__name__)
 
     def _start(self, job_id, slot, now_dt, now):
+        if not jobs.is_own(job_id):
+            return   # never: local files are always this container's jobs (defence in depth)
         try:
             ok = self.store.mark_running(job_id, slot, now_dt)
         except Exception as exc:
@@ -258,6 +260,11 @@ class Runner:
             except subprocess.TimeoutExpired:
                 child["proc"].kill()
         self.reap()
+        # Redeploy / shutdown: jobs still waiting here would never run (the next container has
+        # another disk). End them now so their quota comes back at once.
+        for job_id, job in jobs.local_jobs(self.base).items():
+            if job["state"].get("status") == "queued":
+                self._safe_fail(job_id, "CONVERSION_INTERRUPTED")
 
 
 def beat_forever(base, stop_event):

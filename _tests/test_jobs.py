@@ -115,6 +115,12 @@ def blank_pdf(path):
     doc.close()
 
 
+def other_id():
+    """A job id created by another container (redeploy overlap)."""
+    tag = "zzzzzz" if jobs.instance_tag() != "zzzzzz" else "yyyyyy"
+    return tag + jobs.new_job_id()[jobs.INSTANCE_TAG_LEN:]
+
+
 class TempJobsDir(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp(prefix="jobs-test-"))
@@ -127,8 +133,8 @@ class TempJobsDir(unittest.TestCase):
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def add_job(self, user=USER, status="queued", size="small", cost=6, created=None, pdf=True, docx=False,
-                row_extra=None, state_extra=None):
-        job_id = jobs.new_job_id()
+                row_extra=None, state_extra=None, other_container=False):
+        job_id = other_id() if other_container else jobs.new_job_id()
         p = jobs.paths(job_id)
         jobs.ensure_dir()
         if pdf:
@@ -667,6 +673,14 @@ class ApiTests(TempJobsDir):
         body = self.client.get(f"/api/jobs/{job}", headers=self.auth()).get_json()
         self.assertEqual((body["code"], body["scanned_pages"], body["counted"]), ("SCANNED_PAGE_LIMIT", 60, False))
 
+    def test_status_of_a_job_on_the_other_container(self):
+        job = self.add_job(other_container=True, status="running", pdf=False)
+        jobs.delete_job_files(job, keep_records=False)
+        body = self.client.get(f"/api/jobs/{job}", headers=self.auth()).get_json()
+        self.assertEqual(body["status"], "running")                   # not failed
+        self.assertEqual(self.store.released, [])
+        self.assertEqual(self.client.get(f"/api/jobs/{job}", headers=self.auth(OTHER)).status_code, 404)
+
     def test_health_reports_the_runner(self):
         self.assertEqual(self.client.get("/api/health").get_json()["runner"], "alive")
         jobs.beat_file().unlink()
@@ -676,6 +690,63 @@ class ApiTests(TempJobsDir):
     def test_old_convert_endpoint_still_registered(self):
         rules = {r.rule for r in self.server.app.url_map.iter_rules()}
         self.assertTrue({"/api/convert", "/api/jobs", "/api/jobs/<job_id>", "/api/jobs/<job_id>/download"} <= rules)
+
+
+# ---------------------------------------------------------------------------
+# Redeploy overlap: old and new container share the table, not the disk
+# ---------------------------------------------------------------------------
+class OverlapTests(TempJobsDir):
+    def test_ids_carry_this_container_tag(self):
+        job = jobs.new_job_id()
+        self.assertTrue(jobs.valid_id(job) and jobs.is_own(job))
+        self.assertTrue(job.startswith(jobs.instance_tag()))
+        self.assertFalse(jobs.is_own(other_id()))
+        with mock.patch.dict(os.environ, {"RAILWAY_DEPLOYMENT_ID": "next-deploy"}):
+            self.assertFalse(jobs.is_own(job))           # a new deployment is another container
+
+    def test_new_container_leaves_the_old_containers_jobs_alone(self):
+        queued = self.add_job(other_container=True, pdf=False)               # file on the old disk
+        running = self.add_job(user=OTHER, status="running", other_container=True, pdf=False,
+                               row_extra={"heartbeat_at": jobs.iso(NOW - timedelta(seconds=30))})
+        for job in (queued, running):
+            jobs.delete_job_files(job, keep_records=False)
+        self.assertEqual(jobs.sweep(self.store, now=NOW, startup=True), 0)
+        self.assertEqual((self.store.rows[queued]["status"], self.store.rows[running]["status"]), ("queued", "running"))
+        self.assertEqual(self.store.released, [])
+
+    def test_old_containers_jobs_end_by_the_time_limits(self):
+        queued = self.add_job(other_container=True, pdf=False,
+                              row_extra={"created_at": jobs.iso(NOW - timedelta(minutes=16))})
+        running = self.add_job(user=OTHER, status="running", other_container=True, pdf=False,
+                               row_extra={"heartbeat_at": jobs.iso(NOW - timedelta(minutes=4))})
+        jobs.sweep(self.store, now=NOW, startup=True)
+        self.assertEqual(self.store.rows[queued]["error_code"], "QUEUE_TIMEOUT")
+        self.assertEqual(self.store.rows[running]["error_code"], "CONVERSION_INTERRUPTED")
+        self.assertEqual(sorted(self.store.released), sorted([queued, running]))
+
+    def test_own_queued_job_without_its_upload_still_fails_at_once(self):
+        job = self.add_job(pdf=False)
+        jobs.sweep(self.store, now=NOW)
+        self.assertEqual(self.store.rows[job]["error_code"], "CONVERSION_INTERRUPTED")
+
+    def test_runner_never_claims_a_job_it_has_no_file_for(self):
+        job = self.add_job(other_container=True, pdf=False)
+        jobs.delete_job_files(job, keep_records=False)       # only the Supabase row exists here
+        r = jobs_worker.Runner(self.store, spawn=lambda j: FakeProc())
+        r.last_sweep = time.time()
+        r.tick()
+        self.assertEqual(r.children, {})
+        self.assertEqual(self.store.rows[job]["status"], "queued")
+        r._start(job, "any", NOW, time.time())                # even if asked directly
+        self.assertEqual(r.children, {})
+
+    def test_stopping_runner_ends_its_queued_jobs_and_gives_the_quota_back(self):
+        waiting = self.add_job()
+        r = jobs_worker.Runner(self.store, spawn=lambda j: FakeProc())
+        r.stopping = True
+        r.stop_children(wait=0)
+        self.assertEqual(self.store.rows[waiting]["error_code"], "CONVERSION_INTERRUPTED")
+        self.assertEqual(self.store.released, [waiting])
 
 
 class ImageTests(unittest.TestCase):

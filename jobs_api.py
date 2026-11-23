@@ -235,6 +235,11 @@ def create_blueprint(server):
         if row is None:
             return None, error("JOB_NOT_FOUND", 404)
         status = row.get("status")
+        if status in ("queued", "running") and not jobs.is_own(job_id):
+            # Another container (redeploy overlap) still has it; it ends the job itself.
+            return {"job_id": job_id, "status": status, "pages_total": row.get("pages_total"),
+                    "pages_done": row.get("pages_done") or 0,
+                    "poll_after_seconds": jobs.POLL_AFTER_SECONDS}, None
         try:
             if status in ("queued", "running"):
                 jobs.fail_job(st, job_id, "CONVERSION_INTERRUPTED")
