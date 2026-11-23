@@ -1082,11 +1082,12 @@ def _try_pdf2docx_page(document, conv_page, pdf_page):
 
 
 def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=None, max_ocr_pages=None,
-                        deadline=None):
+                        deadline=None, progress=None):
     """Convert; return a report {"pages": [...], "counts": {...}}.
     Raises EmptyDocumentError, ScannedPageLimitError, ConversionTimeoutError.
     `plan`: from plan_pdf(). `deadline`: from make_deadline() (None: no limit).
-    output_path exists only if the conversion finished."""
+    `progress(pages_done, pages_total)`: called before each page and at the end (jobs.py);
+    it may raise to stop the conversion. output_path exists only if the conversion finished."""
     max_ocr = MAX_OCR_PAGES if max_ocr_pages is None else max_ocr_pages
     part_path = str(output_path) + ".part"
     doc = fitz.open(pdf_path)
@@ -1126,6 +1127,8 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
         notes = []                                         # notes of pages kept as images
         for i, page in enumerate(doc):
             check_deadline(deadline)
+            if progress is not None:
+                progress(i, len(plan))
             started = time.monotonic()
             route, info = plan[i]
             entry = {"page": i + 1, "route": route, **info}
@@ -1191,6 +1194,8 @@ def convert_pdf_to_docx(pdf_path, output_path, languages=OCR_LANGUAGES, plan=Non
         check_deadline(deadline)
         document.save(part_path)
         os.replace(part_path, output_path)        # never a half-written DOCX
+        if progress is not None:
+            progress(len(plan), len(plan))
     finally:
         if conv is not None:
             conv.close()

@@ -23,6 +23,8 @@ Endpoints:
   GET  /api/health   -> health check (public)
   GET  /api/me       -> { plan, subscription_status, ... } for the caller (auth)
   POST /api/convert  -> multipart/form-data, field "file" (auth + limit)
+  POST /api/jobs, GET/DELETE /api/jobs/<id>, GET /api/jobs/<id>/download
+                     -> conversion jobs (jobs_api.py, run by jobs_worker.py)
   POST /api/paddle/webhook, POST /api/billing/portal -> see billing.py
   DELETE /api/account -> JSON {"confirm": "DELETE"} (auth + rate limit):
                        deletes the profile row, then the Supabase auth user
@@ -34,6 +36,7 @@ Run:
 import logging
 import os
 import re
+import sys
 import tempfile
 import threading
 import time
@@ -50,6 +53,7 @@ from supabase import create_client
 
 import billing
 import conversion
+import jobs_api
 from conversion import ConversionTimeoutError, EmptyDocumentError
 
 logging.basicConfig(level=logging.INFO)
@@ -310,7 +314,8 @@ def run_conversion(input_path, output_path, plan=None, deadline=None):
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    # runner: "alive" / "dead" (jobs runner heartbeat, see jobs_worker.py)
+    return jsonify({"status": "ok", **jobs_api.health_fields()})
 
 
 @app.route("/api/me", methods=["GET"])
@@ -708,6 +713,10 @@ app.register_blueprint(billing.create_blueprint(
     get_store=lambda: billing.SupabaseStore(_supabase_admin()),
     get_user_id=get_authenticated_user_id,
 ))
+
+# Conversion jobs (POST /api/jobs, status, download, delete): jobs_api.py. /api/convert above
+# stays unchanged until the owner approves its removal.
+app.register_blueprint(jobs_api.create_blueprint(sys.modules[__name__]))
 
 
 # Runs once per gunicorn worker at import time.

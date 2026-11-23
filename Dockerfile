@@ -18,4 +18,7 @@ COPY . .
 
 # Railway injects PORT at runtime; 8080 matches the public domain target port.
 # 2 workers x 1 thread keeps OCR memory under the 2 GB limit.
-CMD gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --threads 1 --timeout 300 --graceful-timeout 30 server:app
+# start.py runs this gunicorn command plus the jobs runner (jobs_worker.py), restarts the runner
+# if it dies, and passes SIGTERM on (exec: start.py is PID 1 and gets the signal).
+# One Railway replica only: job files and the runner heartbeat are on the local disk.
+CMD exec python start.py gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 2 --threads 1 --timeout 300 --graceful-timeout 30 server:app

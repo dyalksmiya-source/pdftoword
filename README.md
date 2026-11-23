@@ -98,7 +98,25 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   `delete-account.html` (en, fr, ar), the URL for Google Play.
 - `POST /api/billing/portal` — same auth; returns Paddle customer portal links
   `{ overview_url, cancel_url, update_payment_url }` (503 without `PADDLE_API_KEY`).
-- `POST /api/convert` — same auth; multipart field `file`. Machine-readable
+- **Conversion jobs** (`jobs.py`, `jobs_api.py`, runner `jobs_worker.py`, supervisor `start.py`;
+  Supabase table `conversion_jobs`, migration WORD `docs/sql/004_conversion_jobs.sql`):
+  - `POST /api/jobs` — same auth and quota rules as `/api/convert`; multipart `file`; returns
+    `202 {job_id, status: "queued", poll_after_seconds: 3}`. Refusals as `/api/convert`, plus
+    `SERVER_BUSY` (503: runner not alive, or 20 jobs queued/running; quota not used) and
+    `JOB_ACTIVE` (409, one active job per user, with its `job_id`). Scanned pages per file:
+    Pro 50 (`JOB_MAX_OCR_PAGES_PRO`), Free 20 (`JOB_MAX_OCR_PAGES_FREE`).
+  - `GET /api/jobs/<id>` — owner only (else 404 `JOB_NOT_FOUND`); `queued` + `position`,
+    `running` + `pages_done`/`pages_total`, `done` + `expires_in_seconds`, `failed` + `code`,
+    `expired` + `JOB_EXPIRED` and `counted`. 15 requests per 30 s per user (429 + `Retry-After`).
+  - `GET /api/jobs/<id>/download` — the DOCX, any number of times within the hour (first download
+    = the conversion counts). `DELETE /api/jobs/<id>` — cancel, or delete after a successful save.
+  - Limits: `JOB_TIME_BUDGET` 600 s per job, `JOB_QUEUE_TIMEOUT` 900 s queued, files kept 1 hour.
+    Failed, cancelled, interrupted (crash, redeploy, Serverless sleep) or never-downloaded jobs give
+    the quota back once (`release_job_quota`). `JOB_SLOTS` 2: one slot for any job, one for small
+    jobs (≤ 5 scanned pages, ≤ 20 pages). **One Railway replica only** (files on the local disk).
+  - `GET /api/health` adds `runner: alive | dead` (local heartbeat every 5 s, dead after 30 s).
+- `POST /api/convert` — same auth; multipart field `file`. Kept unchanged until the site and the
+  app use the jobs. Machine-readable
   error codes: `AUTH_REQUIRED`, `INVALID_TOKEN`, `PROFILE_NOT_FOUND`,
   `FREE_LIMIT_REACHED` (HTTP 429 + `retry_after_seconds`), `DAILY_LIMIT_REACHED`
   (Pro fair use: `PRO_DAILY_LIMIT`, default 100 per rolling 24 h; HTTP 429 +
