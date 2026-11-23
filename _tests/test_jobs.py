@@ -704,6 +704,26 @@ class OverlapTests(TempJobsDir):
         with mock.patch.dict(os.environ, {"RAILWAY_DEPLOYMENT_ID": "next-deploy"}):
             self.assertFalse(jobs.is_own(job))           # a new deployment is another container
 
+    def test_every_id_matches_the_sql_constraint(self):
+        """conversion_jobs.id: check (id ~ '^[A-Za-z0-9_-]{43}$') in SQL 004 (applied, not changed)."""
+        import re
+        sql_rx = r"^[A-Za-z0-9_-]{43}$"
+        sql = SITE.parent / "docs" / "sql" / "004_conversion_jobs.sql"   # WORD repo, when next to the site
+        if sql.is_file():
+            self.assertIn("check (id ~ '" + sql_rx + "')", sql.read_text(encoding="utf-8"))
+        rx = re.compile(sql_rx)
+        envs = [{}, {"RAILWAY_DEPLOYMENT_ID": "d-1", "RAILWAY_REPLICA_ID": "r-1"},
+                {"RAILWAY_DEPLOYMENT_ID": "x" * 500}]
+        for env in envs:
+            with mock.patch.dict(os.environ, env):
+                ids = [jobs.new_job_id() for _ in range(20000)]
+                self.assertTrue(all(rx.fullmatch(i) for i in ids), [i for i in ids if not rx.fullmatch(i)][:3])
+                self.assertEqual({len(i) for i in ids}, {43})
+                self.assertEqual(len(set(ids)), len(ids))
+                self.assertEqual({i[:jobs.INSTANCE_TAG_LEN] for i in ids}, {jobs.instance_tag()})
+        # random part: 37 base64url characters = 222 bits (>= 160)
+        self.assertGreaterEqual((43 - jobs.INSTANCE_TAG_LEN) * 6, 160)
+
     def test_new_container_leaves_the_old_containers_jobs_alone(self):
         queued = self.add_job(other_container=True, pdf=False)               # file on the old disk
         running = self.add_job(user=OTHER, status="running", other_container=True, pdf=False,
