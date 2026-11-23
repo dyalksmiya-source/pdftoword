@@ -61,7 +61,7 @@
     {
       "@type": "Question",
       "name": "Is scanned PDF conversion free?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Yes, with the same daily conversion limit as regular PDF to Word conversion. Pro allows up to 100 files per day. Scanned PDFs can have up to 30 pages per file." }
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes, with the same daily conversion limit as regular PDF to Word conversion. Pro allows up to 100 files per day. Scanned PDFs can have up to 50 pages per file with Pro and 20 with a free account." }
     }
   ]
 }
@@ -285,7 +285,7 @@
             <p class="dropzone-or">or</p>
             <button type="button" class="btn btn-primary" id="browseBtn">Choose PDF file</button>
             <input type="file" id="fileInput" accept="application/pdf,.pdf" class="visually-hidden" aria-hidden="true" tabindex="-1">
-            <p class="dropzone-hint">Maximum file size: 25 MB · up to <span data-config="scanned-pages-limit">30</span> scanned pages · OCR runs automatically on image-only pages</p>
+            <p class="dropzone-hint">Maximum file size: 25 MB · up to <span data-config="scanned-pages-limit-pro">50</span> scanned pages with Pro (<span data-config="scanned-pages-limit-free">20</span> free) · OCR runs automatically on image-only pages</p>
           </div>
           <p class="tool-error" id="toolError" role="alert" hidden></p>
         </div>
@@ -508,7 +508,7 @@
             </button>
           </h3>
           <div class="faq-answer" id="faq-a5" role="region" aria-labelledby="faq-q5" hidden>
-            <p>Yes, with the same daily conversion limit as regular PDF to Word conversion. Pro allows up to <span data-config="pro-daily-limit">100</span> files per day. Scanned PDFs can have up to <span data-config="scanned-pages-limit">30</span> pages per file.</p>
+            <p>Yes, with the same daily conversion limit as regular PDF to Word conversion. Pro allows up to <span data-config="pro-daily-limit">100</span> files per day. Scanned PDFs can have up to <span data-config="scanned-pages-limit-pro">50</span> pages per file with Pro and <span data-config="scanned-pages-limit-free">20</span> with a free account.</p>
           </div>
         </div>
 

@@ -34,6 +34,8 @@ logger = logging.getLogger("pdf2wordly.jobs")
 
 # ---------------------------------------------------------------------------
 # Settings (owner decisions, 2026-11-23). /api/convert keeps its own limits (30 pages, 240 s).
+# The scanned caps are the site numbers "scanned-pages-limit-pro" / "-free" in _tools/site-config.json
+# (checked by tests).
 # ---------------------------------------------------------------------------
 JOBS_DIR = Path(os.environ.get("JOBS_DIR") or (Path(tempfile.gettempdir()) / "pdf2wordly-jobs"))
 JOB_MAX_OCR_PAGES_PRO = int(os.environ.get("JOB_MAX_OCR_PAGES_PRO", "50"))

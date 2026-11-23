@@ -583,7 +583,11 @@ class ScannedPageCap(Tmp):
         import json
         import subprocess
         cfg = json.loads((SITE / "_tools" / "site-config.json").read_text(encoding="utf-8"))
-        self.assertEqual(str(C.MAX_OCR_PAGES), cfg["scanned-pages-limit"])
+        # /api/convert keeps its own cap (30); the site shows the job caps (jobs.py, Pro 50 / Free 20).
+        import jobs
+        self.assertEqual(C.MAX_OCR_PAGES, 30)
+        self.assertEqual(str(jobs.JOB_MAX_OCR_PAGES_PRO), cfg["scanned-pages-limit-pro"])
+        self.assertEqual(str(jobs.JOB_MAX_OCR_PAGES_FREE), cfg["scanned-pages-limit-free"])
         env = dict(os.environ, MAX_OCR_PAGES="7")
         out = subprocess.run([sys.executable, "-c", "import conversion; print(conversion.MAX_OCR_PAGES)"],
                              cwd=str(SITE), env=env, capture_output=True, text=True)
@@ -637,7 +641,8 @@ class ScannedPageCapApi(unittest.TestCase):
     def test_site_message_in_three_languages(self):
         js = (SITE / "script.js").read_text(encoding="utf-8")
         self.assertIn('case"SCANNED_PAGE_LIMIT":return pwScannedMsg(x);', js)
-        self.assertIn("S=e.scanned_pages,X=e.max_scanned_pages", js)
+        self.assertIn("scannedPages:n.scanned_pages,maxScanned:n.max_scanned_pages", js)   # pwApiError (jobs)
+        self.assertIn("scannedPages:s.scanned_pages,maxScanned:s.max_scanned_pages", js)   # failed job status
         self.assertIn("Divisez le PDF ou convertissez les {max} premières pages.", js)
         self.assertIn("قسّم الملف أو حوّل أول {max} صفحة.", js)
 

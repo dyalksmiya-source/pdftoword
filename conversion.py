@@ -73,7 +73,8 @@ UNREADABLE_NOTE = {
 }
 FRENCH_WORDS = frozenset("le la les des et est une un du pour dans que qui sur avec pas par au aux ce cette sont".split())
 ENGLISH_WORDS = frozenset("the and of to is in for that with on are this be as by it an was from".split())
-# Same number as "scanned-pages-limit" in _tools/site-config.json (checked by tests).
+# /api/convert only (kept until its removal). Jobs use jobs.JOB_MAX_OCR_PAGES_PRO / _FREE, the numbers the
+# site shows ("scanned-pages-limit-pro" / "-free" in _tools/site-config.json, checked by tests).
 MAX_OCR_PAGES = int(os.environ.get("MAX_OCR_PAGES", "30"))
 # Seconds per request, below gunicorn's --timeout 300 (Dockerfile; checked by tests).
 CONVERSION_TIME_BUDGET = float(os.environ.get("CONVERSION_TIME_BUDGET", "240"))

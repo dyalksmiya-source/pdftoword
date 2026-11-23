@@ -170,8 +170,9 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
   OCR costs 2–5 s per page and the worker timeout is 300 s). Counted after
   page routing, before converting: more returns `SCANNED_PAGE_LIMIT` (413)
   with `scanned_pages` and `max_scanned_pages`, and does not use the quota.
-  The site shows the same number from `scanned-pages-limit` in
-  `_tools/site-config.json` (keep both equal; tests check it).
+  This is the old endpoint's cap; the site shows the job caps (Pro 50, Free 20) from
+  `scanned-pages-limit-pro` / `scanned-pages-limit-free` in `_tools/site-config.json`
+  (equal to `jobs.py`; tests check it).
 - Time budget per request: `CONVERSION_TIME_BUDGET` seconds (default 240, below
   gunicorn's `--timeout 300` in the `Dockerfile`; tests check it). The clock
   starts when `/api/convert` is called and is checked between pages; past it the

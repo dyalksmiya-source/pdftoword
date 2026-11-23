@@ -6,5 +6,6 @@
   "pro-daily-limit": "100",
   "refund-days": "14",
   "reply-time": "within 2 business days",
-  "scanned-pages-limit": "30"
+  "scanned-pages-limit-pro": "50",
+  "scanned-pages-limit-free": "20"
 }
