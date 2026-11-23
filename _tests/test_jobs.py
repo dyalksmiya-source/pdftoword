@@ -501,6 +501,8 @@ class ApiTests(TempJobsDir):
                 data = {"allowed": self.free_allowed, "previous": "2026-11-01T00:00:00+00:00"}
             elif name == "claim_pro_conversion":
                 data = {"allowed": True, "claim_id": 41}
+            elif name == "claim_ad_reward":                      # SQL 005: no rewarded ad watched
+                data = {"allowed": False, "reason": "no_reward"}
             return mock.Mock(execute=mock.Mock(return_value=mock.Mock(data=data)))
         admin.rpc.side_effect = rpc
         self.profile = {"id": USER, "plan": "free"}

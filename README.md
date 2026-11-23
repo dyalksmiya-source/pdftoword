@@ -115,6 +115,24 @@ edit the production fallback in `resolveBackendUrl()` in `script.js`
     the quota back once (`release_job_quota`). `JOB_SLOTS` 2: one slot for any job, one for small
     jobs (≤ 5 scanned pages, ≤ 20 pages). **One Railway replica only** (files on the local disk).
   - `GET /api/health` adds `runner: alive | dead` (local heartbeat every 5 s, dead after 30 s).
+- **Rewarded ads, Android app** (`ads.py`; table `ad_rewards`, migration WORD
+  `docs/sql/005_ad_rewards.sql`; plan WORD `docs/plans/step8.5-ads.md`). Pro: no ads.
+  - `POST /api/ads/reward-token` — signed in, Free; `{custom_data, reward_id, expires_in_seconds}`.
+    `custom_data` (HMAC-SHA256 with `ADS_TOKEN_SECRET`, 1 hour) holds the user id and a one-time id;
+    the app passes it to AdMob as the SSV custom data. `409 ADS_NOT_FOR_PRO`, `429 AD_LIMIT_REACHED`
+    (hidden cap), `503 ADS_UNAVAILABLE` (no secret).
+  - `GET /api/ads/ssv` — AdMob Server-Side Verification callback. Google's ECDSA signature is checked
+    with the official verifier keys (cached 24 h), the ad unit must be in `ADS_REWARDED_AD_UNITS`,
+    the user id comes only from the token; `transaction_id` and `reward_id` are unique. 403 bad
+    signature, 503 temporary problem (Google retries), 200 otherwise (`rewarded: true|false`).
+  - `GET /api/ads/status[?reward_id=]` — signed in; `{plan, free_available, rewards_available,
+    can_watch_ad, reward_arrived}` (SSV can take a few seconds: poll this).
+  - `POST /api/jobs`: when the free conversion is used, one unused reward (valid 24 h) is consumed
+    atomically (`claim_ad_reward`); the job has the Free limits (20 pages, 20 scanned). Otherwise
+    `FREE_LIMIT_REACHED` carries `ad_allowed`. A failed / cancelled / never-downloaded job gives the
+    reward back once (trigger on `release_job_quota`). Optional `ADS_MAX_REWARDS_PER_DAY` (default 0 =
+    no cap). `/api/convert` does not use rewards.
+  - `app-ads.txt` at the site root: replace the placeholder publisher id.
 - `POST /api/convert` — same auth; multipart field `file`. Kept unchanged until the site and the
   app use the jobs. Machine-readable
   error codes: `AUTH_REQUIRED`, `INVALID_TOKEN`, `PROFILE_NOT_FOUND`,

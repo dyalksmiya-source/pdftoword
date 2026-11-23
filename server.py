@@ -51,6 +51,7 @@ from flask_cors import CORS
 import fitz  # PyMuPDF
 from supabase import create_client
 
+import ads
 import billing
 import conversion
 import jobs_api
@@ -717,6 +718,9 @@ app.register_blueprint(billing.create_blueprint(
 # Conversion jobs (POST /api/jobs, status, download, delete): jobs_api.py. /api/convert above
 # stays unchanged until the owner approves its removal.
 app.register_blueprint(jobs_api.create_blueprint(sys.modules[__name__]))
+
+# Rewarded ads for the Android app (reward token, Google SSV callback, status): ads.py.
+app.register_blueprint(ads.create_blueprint(sys.modules[__name__]))
 
 
 # Runs once per gunicorn worker at import time.

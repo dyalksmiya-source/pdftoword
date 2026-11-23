@@ -9,7 +9,10 @@ Job endpoints (registered by server.py; /api/convert is unchanged and separate):
 
 Same rules as /api/convert: user id only from the verified token, quota claimed when the job
 is created (Free 1 per 24 h, 20 pages; Pro 100 per 24 h, 200 pages) and released once if the
-job fails, is cancelled, or expires without a download. Only the owner sees a job: any other
+job fails, is cancelled, or expires without a download. After the free conversion, a Free user
+can convert again with one verified rewarded ad (ads.py, SQL 005): one reward is consumed
+atomically, the job has the Free limits, and the reward comes back once if the job fails
+(trigger on the quota release). Only the owner sees a job: any other
 caller gets 404 JOB_NOT_FOUND. Polling: token verification cached (jobs.TokenCache) and a
 per-user rate limit on status requests.
 """
@@ -20,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request, send_file
 
+import ads
 import jobs
 
 logger = logging.getLogger("pdf2wordly.jobs_api")
@@ -129,15 +133,20 @@ def create_blueprint(server):
             return error("PROFILE_NOT_FOUND", 403, GENERIC)
         pro = server.is_user_pro(profile)
 
-        claim, refused = claim_quota(server, admin, user_id, profile, pro)
+        job_id = jobs.new_job_id()
+        claim, refused = claim_quota(server, admin, user_id, profile, pro, job_id)
         if refused:
             return refused
 
         def give_back():
             server._release_all(admin, user_id, claim["free_claimed"], claim["free_previous"],
                                 claim["pro_claim_id"])
+            if claim["ad_reward"]:
+                try:
+                    ads.AdStore(admin).give_back(job_id)    # no job row yet: return_ad_reward
+                except Exception:
+                    logger.exception("Job: ad reward give-back failed (healed by the next claim)")
 
-        job_id = jobs.new_job_id()
         p = jobs.paths(job_id)
         try:
             jobs.ensure_dir()
@@ -200,7 +209,8 @@ def create_blueprint(server):
                                     "size": size, "cost": cost, "pages": len(plan), "scanned": scanned,
                                     "max_ocr_pages": max_scanned})
         jobs.write_json(p["state"], {"status": "queued", "pages_done": 0, "pages_total": len(plan)})
-        logger.info("Job queued (%d pages, %d scanned, %s)", len(plan), scanned, size)
+        logger.info("Job queued (%d pages, %d scanned, %s%s)", len(plan), scanned, size,
+                    ", ad reward" if claim["ad_reward"] else "")
         return jsonify({"job_id": job_id, "status": "queued",
                         "poll_after_seconds": jobs.POLL_AFTER_SECONDS}), 202
 
@@ -345,11 +355,12 @@ def create_blueprint(server):
     return bp
 
 
-def claim_quota(server, admin, user_id, profile, pro):
-    """Same claims and refusals as /api/convert (that endpoint keeps its own copy).
-    Returns ({"free_claimed", "free_previous", "pro_claim_id"}, None) or (None, response)."""
+def claim_quota(server, admin, user_id, profile, pro, job_id=None):
+    """Same claims and refusals as /api/convert (that endpoint keeps its own copy), plus the
+    rewarded-ad conversion for Free users (only here, not in /api/convert).
+    Returns ({"free_claimed", "free_previous", "pro_claim_id", "ad_reward"}, None) or (None, response)."""
     from flask import jsonify as _j
-    claim = {"free_claimed": False, "free_previous": None, "pro_claim_id": None}
+    claim = {"free_claimed": False, "free_previous": None, "pro_claim_id": None, "ad_reward": False}
     if not pro:
         try:
             resp = admin.rpc("claim_free_conversion", {"p_user_id": user_id}).execute()
@@ -357,6 +368,10 @@ def claim_quota(server, admin, user_id, profile, pro):
             row = data[0] if isinstance(data, list) and data else data
             allowed = bool(row.get("allowed")) if isinstance(row, dict) else False
             if not allowed:
+                ad = claim_ad_reward(admin, user_id, job_id)
+                if ad.get("allowed"):
+                    claim["ad_reward"] = True
+                    return claim, None
                 payload = {"code": "FREE_LIMIT_REACHED",
                            "error": ("You have used your free conversion for the last 24 hours. Try again "
                                      f"later or upgrade to Pro (up to {server.PRO_DAILY_LIMIT} files per day).")}
@@ -368,6 +383,8 @@ def claim_quota(server, admin, user_id, profile, pro):
                             0, int(86400 - (datetime.now(timezone.utc) - last_dt).total_seconds()))
                 except Exception:
                     pass
+                # For the app: can a rewarded ad unlock one more conversion? (The site ignores it.)
+                payload["ad_allowed"] = ads.enabled() and ad.get("reason") != "cap"
                 return None, (_j(payload), 429)
             claim["free_claimed"] = True
             claim["free_previous"] = row.get("previous")
@@ -394,6 +411,19 @@ def claim_quota(server, admin, user_id, profile, pro):
         except Exception as exc:
             logger.error("Job: Pro fair-use claim failed (%s); allowed", type(exc).__name__)
     return claim, None
+
+
+def claim_ad_reward(admin, user_id, job_id):
+    """{"allowed": True, "reward_id"} or {"allowed": False, "reason"}. Never raises: before
+    SQL 005 runs (or on any error) the answer is simply "no reward"."""
+    if job_id is None:
+        return {"allowed": False, "reason": "no_reward"}
+    try:
+        row = ads.AdStore(admin).claim(user_id, job_id, ads.max_rewards_per_day())
+    except Exception as exc:
+        logger.error("Job: ad reward claim failed (%s)", type(exc).__name__)
+        return {"allowed": False, "reason": "error"}
+    return row if row.get("allowed") else {"allowed": False, "reason": row.get("reason") or "no_reward"}
 
 
 def health_fields():

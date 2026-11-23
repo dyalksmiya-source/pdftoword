@@ -1,0 +1,3 @@
+# app-ads.txt for the PDF2Wordly Android app (AdMob). Served at https://pdf2wordly.com/app-ads.txt
+# Replace pub-0000000000000000 with your AdMob publisher id (AdMob -> Settings -> Account information).
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
