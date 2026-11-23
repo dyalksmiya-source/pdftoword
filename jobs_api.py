@@ -148,13 +148,16 @@ def create_blueprint(server):
                     logger.exception("Job: ad reward give-back failed (healed by the next claim)")
 
         p = jobs.paths(job_id)
+        step = "save"                     # logged when the PDF can't be read (no name, no user id)
         try:
             jobs.ensure_dir()
             uploaded.save(str(p["pdf"]))
+            step = "magic"
             with open(p["pdf"], "rb") as fh:
                 magic = fh.read(5)
             if magic != b"%PDF-":
                 raise ValueError("not a pdf")
+            step = "open"
             reject_code, reject_extra = server.check_pdf_limits(
                 str(p["pdf"]), server.PRO_MAX_PAGES if pro else server.FREE_MAX_PAGES)
             if reject_code == "PASSWORD_REQUIRED":
@@ -168,8 +171,10 @@ def create_blueprint(server):
                 return error("PAGE_LIMIT_EXCEEDED", 400,
                              f"This PDF has too many pages. The limit is {reject_extra['max_pages']} "
                              "pages per file.", **reject_extra)
+            step = "plan"
             plan = server.conversion.plan_pdf(str(p["pdf"]), deadline=server.conversion.make_deadline(60))
-        except Exception:
+        except Exception as exc:
+            logger.warning("Job: PDF could not be read (step %s, %s)", step, type(exc).__name__)
             jobs.remove(p["pdf"])
             give_back()
             return error("CONVERSION_FAILED", 400, "We couldn't read this PDF. Please try another file.")

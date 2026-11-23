@@ -689,6 +689,32 @@ class ApiTests(TempJobsDir):
         body = self.client.get("/api/health").get_json()
         self.assertEqual((body["status"], body["runner"]), ("ok", "dead"))
 
+    def test_real_word_pdf_is_read_and_page_counted(self):
+        """A real PDF made by Microsoft Word (fixtures/sample-word.pdf, 3 pages, a table) through
+        the same code as POST /api/jobs: upload, magic, check_pdf_limits (page count), plan_pdf."""
+        sample = SITE / "_tests" / "fixtures" / "sample-word.pdf"
+        self.assertEqual(self.server.check_pdf_limits(str(sample), 2),
+                         ("PAGE_LIMIT_EXCEEDED", {"max_pages": 2, "pages": 3}))
+        data = {"file": (io.BytesIO(sample.read_bytes()), "sample-word.pdf")}
+        with self.assertNoLogs("pdf2wordly.jobs_api", level="WARNING"):
+            r = self.client.post("/api/jobs", data=data, headers=self.auth(), content_type="multipart/form-data")
+        self.assertEqual(r.status_code, 202, r.get_json())
+        row = self.store.rows[r.get_json()["job_id"]]
+        self.assertEqual((row["pages_total"], row["scanned_pages"], row["size_class"]), (3, 0, "small"))
+
+    def test_unreadable_pdf_logs_the_step_and_exception_type_only(self):
+        for content, step in ((b"%PDF-1.7\nnot really a pdf", "open"), (b"hello, not a pdf", "magic")):
+            data = {"file": (io.BytesIO(content), "Secret name.pdf")}
+            with self.assertLogs("pdf2wordly.jobs_api", level="WARNING") as logs:
+                r = self.client.post("/api/jobs", data=data, headers=self.auth(),
+                                     content_type="multipart/form-data")
+            self.assertEqual((r.status_code, r.get_json()["code"]), (400, "CONVERSION_FAILED"))
+            line = "\n".join(logs.output)
+            self.assertRegex(line, rf"PDF could not be read \(step {step}, \w+\)")
+            self.assertNotIn("Secret", line)
+            self.assertNotIn(USER, line)
+        self.assertIn("release_free_conversion", self.rpc_calls)          # quota given back
+
     def test_old_convert_endpoint_still_registered(self):
         rules = {r.rule for r in self.server.app.url_map.iter_rules()}
         self.assertTrue({"/api/convert", "/api/jobs", "/api/jobs/<job_id>", "/api/jobs/<job_id>/download"} <= rules)
