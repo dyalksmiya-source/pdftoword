@@ -130,7 +130,7 @@
     "privacy.html": {
       "url": "/privacy.html", "lang": "en", "index": true, "type": "website",
       "title": "Privacy Policy | PDF2Wordly",
-      "description": "How PDF2Wordly handles your data: files deleted within 30 minutes, the account data we keep, the services we use, and your privacy rights.",
+      "description": "How PDF2Wordly handles your data: files deleted within 1 hour, the account data we keep, the services we use, and your privacy rights.",
       "primary": "pdf2wordly privacy policy",
       "secondary": []
     },

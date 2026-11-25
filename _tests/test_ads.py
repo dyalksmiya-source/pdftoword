@@ -248,7 +248,9 @@ class AdsApiTests(TempJobsDir):
                 data = {"allowed": True, "claim_id": 41}
             return mock.Mock(execute=mock.Mock(return_value=mock.Mock(data=data)))
         admin.rpc.side_effect = rpc
-        self.profile = {"plan": "free", "last_free_conversion_at": "2026-11-23T10:00:00+00:00"}
+        # free conversion used 1 hour ago (relative to now, so the rolling 24 h window is always still running)
+        self.profile = {"plan": "free",
+                        "last_free_conversion_at": datetime.fromtimestamp(time.time() - 3600, timezone.utc).isoformat()}
         self.users = {}
         self.g = GoogleSigner()
         bp = self.server.app.blueprints["ads"]
