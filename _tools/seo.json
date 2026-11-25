@@ -17,10 +17,10 @@
   "pages": {
     "index.html": {
       "url": "/", "lang": "en", "group": "home", "index": true, "type": "website",
-      "title": "PDF to Word Converter – Free, Online & Editable | PDF2Wordly",
-      "description": "Convert PDF to Word online with PDF2Wordly: an editable DOCX in seconds, OCR for scanned PDFs in English, French and Arabic, and a free plan.",
+      "title": "PDF to Word Converter Online, Free with OCR | PDF2Wordly",
+      "description": "A free PDF to Word (PDF2Word) converter online: an editable DOCX that keeps tables and layout, plus OCR for scanned PDFs in English, French and Arabic.",
       "primary": "pdf to word converter",
-      "secondary": ["convert pdf to word online free", "pdf2word", "pdf to docx"]
+      "secondary": ["pdf2word", "pdf2word converter", "pdf2word online", "free pdf to word converter online", "convert pdf to word online free", "convert pdf to word", "pdf to docx"]
     },
     "fr/index.html": {
       "url": "/fr/", "lang": "fr", "group": "home", "index": true, "type": "website",
