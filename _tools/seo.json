@@ -31,10 +31,10 @@
     },
     "ar/index.html": {
       "url": "/ar/", "lang": "ar", "group": "home", "index": true, "type": "website",
-      "title": "تحويل PDF إلى Word أونلاين مجانًا | PDF2Wordly",
-      "description": "حوّل ملف PDF إلى Word قابل للتعديل أونلاين في ثوانٍ، مع التعرّف الضوئي على النصوص في الملفات الممسوحة بالعربية والفرنسية والإنجليزية، وخطة مجانية.",
+      "title": "تحويل PDF إلى Word قابل للتعديل مجانًا | PDF2Wordly",
+      "description": "حوّل ملف PDF إلى Word (بي دي اف إلى وورد) قابل للتعديل أونلاين، مع دعم العربية من اليمين إلى اليسار وOCR للملفات الممسوحة، وتحويل مجاني كل 24 ساعة.",
       "primary": "تحويل pdf الى word",
-      "secondary": ["تحويل من بي دي اف الى وورد", "تحويل ملف pdf الى word", "تحويل pdf الى word مجانا"]
+      "secondary": ["تحويل ملف pdf الى word", "تحويل من pdf الى word", "تحويل بي دي اف الى وورد", "تحويل pdf الى word مجانا", "تحويل pdf الى word قابل للتعديل"]
     },
     "scanned-pdf-to-word.html": {
       "url": "/scanned-pdf-to-word.html", "lang": "en", "index": true, "type": "article",
