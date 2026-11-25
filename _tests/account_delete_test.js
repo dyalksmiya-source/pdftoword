@@ -177,7 +177,7 @@ const answer = (status, body = {}) => async (url, opts) => { answer.last = { url
   // ---- footer link on every page, next to Privacy
   const all = fs.readdirSync(SITE).filter(f => f.endsWith('.html')).concat(['fr/index.html', 'ar/index.html', 'fr/delete-account.html', 'ar/delete-account.html'])
     .filter(f => read(f).includes('class="footer-legal"'));
-  ok(all.length === 27, 'pages with the legal footer: 27 (incl. 404.html)');
+  ok(all.length === 28, 'pages with the legal footer: 28 (incl. 404.html)');
   for (const f of all) {
     const nav = read(f).match(/<nav class="footer-legal"[^>]*>.*?<\/nav>/)[0];
     ok(/privacy\.html">[^<]*<\/a><a href="\/?delete-account\.html">(Delete account|Supprimer le compte|حذف الحساب)<\/a>/.test(nav), `${f}: footer "Delete account" after Privacy`);

@@ -19,7 +19,7 @@ INDEXABLE = {k: v for k, v in PAGES.items() if v.get("index")}
 GUIDES = ["scanned-pdf-to-word.html", "how-to-convert-pdf-to-word.html", "pdf-to-word-without-losing-formatting.html",
           "pdf-to-word-tables-and-business-documents.html", "pdf-to-word-resume.html", "convert-multiple-pdf-files-to-word.html",
           "pdf-to-word-on-mac-and-mobile.html", "pdf-to-word-alternative-to-ilovepdf.html", "pdf-to-word-vs-smallpdf.html",
-          "unlock-password-protected-pdf-to-word.html", "pdf-to-word-not-working.html"]
+          "unlock-password-protected-pdf-to-word.html", "pdf-to-word-not-working.html", "pdf-to-word-faq.html"]
 
 
 class Page(HTMLParser):

@@ -113,6 +113,13 @@
       "primary": "pdf to word not working",
       "secondary": ["pdf to word conversion failed", "pdf won't convert to word"]
     },
+    "pdf-to-word-faq.html": {
+      "url": "/pdf-to-word-faq.html", "lang": "en", "index": true, "type": "article",
+      "title": "PDF to Word FAQ: Common Questions & Solutions | PDF2Wordly",
+      "description": "Answers to common PDF to Word questions: why conversions go wrong and how to fix them, scanned PDFs, formatting, options without Adobe, and AI tools.",
+      "primary": "pdf to word faq",
+      "secondary": ["pdf to word questions", "why is my pdf not converting to word correctly", "converted word document blank", "pdf to word without adobe", "can chatgpt convert pdf to word", "is it safe to convert pdf to word online"]
+    },
     "about.html": {
       "url": "/about.html", "lang": "en", "index": true, "type": "website",
       "title": "About Us: A Simple PDF to Word Tool | PDF2Wordly",

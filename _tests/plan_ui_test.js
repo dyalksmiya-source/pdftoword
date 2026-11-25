@@ -192,7 +192,7 @@ const state = doc => doc.documentElement.getAttribute('data-plan-state');
   const pages = fs.readdirSync(SITE).filter(f => f.endsWith('.html')).map(f => f)
     .concat(['fr/index.html', 'ar/index.html', 'fr/delete-account.html', 'ar/delete-account.html'])
     .filter(f => fs.readFileSync(path.join(SITE, f), 'utf8').includes('header-get-pro'));
-  ok(pages.length === 23, 'pages with a header: 23');
+  ok(pages.length === 24, 'pages with a header: 24');
   for (const pg of pages) {
     const s = fs.readFileSync(path.join(SITE, pg), 'utf8');
     const sub = pg.includes('/');

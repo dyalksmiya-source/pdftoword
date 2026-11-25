@@ -60,6 +60,8 @@ RELATED = {
     "pdf-to-word-vs-smallpdf.html": ["pdf-to-word-alternative-to-ilovepdf.html", "scanned-pdf-to-word.html", "pdf-to-word-without-losing-formatting.html"],
     "unlock-password-protected-pdf-to-word.html": ["pdf-to-word-not-working.html", "how-to-convert-pdf-to-word.html", "scanned-pdf-to-word.html"],
     "pdf-to-word-not-working.html": ["unlock-password-protected-pdf-to-word.html", "scanned-pdf-to-word.html", "convert-multiple-pdf-files-to-word.html"],
+    # not in GUIDES on purpose: GUIDES feeds the footer of every page (protected pages must not change)
+    "pdf-to-word-faq.html": ["pdf-to-word-not-working.html", "pdf-to-word-without-losing-formatting.html", "scanned-pdf-to-word.html"],
 }
 APP_PAGES = {"index.html", "fr/index.html", "ar/index.html", "scanned-pdf-to-word.html"}
 HOME = {"en": "/", "fr": "/fr/", "ar": "/ar/"}
